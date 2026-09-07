@@ -23,7 +23,7 @@ SSH_KEY="${DEPLOY_SSH_KEY:-$HOME/.ssh/lightsail-default-key-us-east-1.pem}"
 SSH_USER="${DEPLOY_USER:-ubuntu}"
 
 # phoenix_paas is built separately on the CX33 — do not overwrite it with the Lightsail release.
-PHOENIX_APPS=(assistente campanha catalog_platform festa_platform open_drive pay_core vexo)
+PHOENIX_APPS=(assistente catalog_platform festa_platform open_drive pay_core vexo)
 GO_APPS_CATALOGO=(leilao-erp trama-bras)
 GO_APPS_ATELIE=(atelie)
 
@@ -156,7 +156,6 @@ Update these A records to $HETZNER_IP:
   vexo.gestaobem.com
   decor.gestaobem.com
   pay.gestaobem.com
-  campanha.gestaobem.com
   drive.gestaobem.com
   clarity.gestaobem.com
   atelie.gestaobem.com
