@@ -96,6 +96,16 @@ golang_apps = [
     runtime: "golang",
     systemd_unit: "trama-bras",
     release_path: "/opt/trama-bras"
+  },
+  %{
+    name: "GitHub Projects",
+    slug: "github-projects",
+    github_repo: "puppe1990/github-projects-viewer-cais",
+    host: "github.gestaobem.com",
+    port: 4021,
+    runtime: "golang",
+    systemd_unit: "github-projects",
+    release_path: "/opt/github-projects"
   }
 ]
 
@@ -117,7 +127,6 @@ reassign_slugs = [
   "catalogo",
   "vexo",
   "assistente",
-  "campanha",
   "decor",
   "open-drive",
   "pay-core",

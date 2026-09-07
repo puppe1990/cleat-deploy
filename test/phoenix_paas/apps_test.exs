@@ -43,6 +43,32 @@ defmodule PhoenixPaas.AppsTest do
     end
   end
 
+  describe "main_language/1" do
+    test "maps phoenix runtime to Elixir and golang to Go" do
+      assert App.main_language(%App{runtime: "phoenix"}) == "Elixir"
+      assert App.main_language(%App{runtime: "golang"}) == "Go"
+      assert App.main_language(%App{runtime: nil}) == "Elixir"
+    end
+  end
+
+  describe "count_apps/1" do
+    test "counts tenant apps without loading them", %{scope: scope, server: server} do
+      assert Apps.count_apps(scope) == 0
+
+      {:ok, _app, _} =
+        Apps.create_app(scope, %{
+          name: "Trip Planner",
+          slug: "trip-planner",
+          github_repo: "puppe1990/trip-planner-ia-phx",
+          host: "trip.gestaobem.com",
+          server_id: server.id
+        })
+
+      assert Apps.count_apps(scope) == 1
+      assert Apps.count_apps(TenancyFixtures.scope_fixture()) == 0
+    end
+  end
+
   describe "create_app/2" do
     test "persists app linked to server", %{scope: scope, server: server} do
       attrs = %{
@@ -135,6 +161,38 @@ defmodule PhoenixPaas.AppsTest do
                "SECRET_KEY_BASE" => "super-secret",
                "GEMINI_API_KEY" => "gemini-key"
              }
+    end
+  end
+
+  describe "delete_app/2" do
+    test "removes the app and cascaded env vars", %{scope: scope, server: server} do
+      {:ok, app, _} =
+        Apps.create_app(scope, %{
+          name: "Ops",
+          slug: "ops-app",
+          github_repo: "puppe1990/ops-app",
+          host: "app.gestaobem.com",
+          server_id: server.id
+        })
+
+      {:ok, _} = Apps.put_env_var(app, "PORT", "4002")
+
+      assert {:ok, %App{}} = Apps.delete_app(scope, app)
+      assert_raise Ecto.NoResultsError, fn -> Apps.get_app!(scope, app.id) end
+    end
+
+    test "rejects another tenant", %{scope: scope, server: server} do
+      {:ok, app, _} =
+        Apps.create_app(scope, %{
+          name: "Ops",
+          slug: "ops-app",
+          github_repo: "puppe1990/ops-app",
+          host: "app.gestaobem.com",
+          server_id: server.id
+        })
+
+      assert {:error, :unauthorized} =
+               Apps.delete_app(TenancyFixtures.scope_fixture(), app)
     end
   end
 end

@@ -2,6 +2,7 @@ defmodule PhoenixPaasWeb.AppLive.Show do
   use PhoenixPaasWeb, :live_view
 
   alias PhoenixPaas.{Apps, Deployments}
+  alias PhoenixPaas.Apps.{RuntimeLogs, RuntimeMemory}
   alias PhoenixPaas.Deploy.RuntimePackages
   alias PhoenixPaasWeb.AppLive.Layout
 
@@ -13,14 +14,14 @@ defmodule PhoenixPaasWeb.AppLive.Show do
     app = Apps.get_app!(scope, id)
     runtime_packages = RuntimePackages.resolve(app).packages
     custom_domain_app? = app.slug == "catalogo"
-    deploying? = active_deployment?(Deployments.for_app(scope, app))
+    deploying? = Deployments.deploying?(scope, app)
 
     socket =
       socket
       |> assign(:page_title, app.name)
       |> assign(:active_tab, :apps)
       |> assign(:app, app)
-      |> assign(:apps, Apps.list_apps(scope))
+      |> assign(:apps, Apps.list_app_choices(scope))
       |> assign(:webhook_url, webhook_url())
       |> assign(:show_secret?, false)
       |> assign(:show_env_values?, false)
@@ -30,8 +31,19 @@ defmodule PhoenixPaasWeb.AppLive.Show do
       |> assign(:custom_domain_app?, custom_domain_app?)
       |> assign(:detail_tabs, Layout.detail_tabs(custom_domain_app?, runtime_packages))
       |> assign(:app_detail_tab, :environment)
+      |> assign(:runtime_logs, nil)
+      |> assign(:logs_error, nil)
+      |> assign(:app_memory, nil)
       |> assign(:deploying?, deploying?)
       |> schedule_poll(deploying?)
+
+    socket =
+      if connected?(socket) do
+        send(self(), :load_app_memory)
+        socket
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -40,7 +52,14 @@ defmodule PhoenixPaasWeb.AppLive.Show do
   def handle_params(params, _uri, socket) do
     case params do
       %{"id" => _id, "tab" => tab} ->
-        {:noreply, assign(socket, :app_detail_tab, Layout.parse_detail_tab(tab))}
+        tab = Layout.parse_detail_tab(tab)
+
+        socket =
+          socket
+          |> assign(:app_detail_tab, tab)
+          |> maybe_load_logs(tab)
+
+        {:noreply, socket}
 
       %{"id" => id} ->
         {:noreply, push_navigate(socket, to: ~p"/apps/#{id}/deployments")}
@@ -77,10 +96,17 @@ defmodule PhoenixPaasWeb.AppLive.Show do
     {:noreply, push_navigate(socket, to: ~p"/apps/#{app_id}/deployments")}
   end
 
+  def handle_event("refresh_logs", _params, socket) do
+    {:noreply, load_logs(socket)}
+  end
+
   @impl true
+  def handle_info(:load_app_memory, socket) do
+    {:noreply, assign(socket, :app_memory, RuntimeMemory.for_app(socket.assigns.app))}
+  end
+
   def handle_info(:poll_deployments, socket) do
-    deploying? =
-      active_deployment?(Deployments.for_app(socket.assigns.current_scope, socket.assigns.app))
+    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
 
     {:noreply,
      socket
@@ -101,7 +127,7 @@ defmodule PhoenixPaasWeb.AppLive.Show do
       <div class="space-y-4">
         <Layout.shell_header app={@app} apps={@apps} />
         <Layout.shell_hero app={@app} deploying?={@deploying?} />
-        <Layout.shell_info_tiles app={@app} />
+        <Layout.shell_info_tiles app={@app} memory={@app_memory} />
 
         <div id="app-detail-tabs" class="paas-card overflow-hidden">
           <Layout.tab_bar app={@app} active_tab={@app_detail_tab} detail_tabs={@detail_tabs} />
@@ -133,6 +159,87 @@ defmodule PhoenixPaasWeb.AppLive.Show do
                   <span class="text-hd-orange">PHX_HOST</span> — primary platform host ({@app.host})
                 </li>
               </ul>
+            </div>
+
+            <div :if={@app_detail_tab == :logs} id="app-runtime-logs" class="space-y-3">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="space-y-0.5">
+                  <h3 class="font-display text-xs font-semibold text-hd-text">
+                    Runtime logs
+                  </h3>
+                  <p class="text-[11px] text-hd-muted">
+                    Last {RuntimeLogs.line_count()} journal lines from
+                    <span class="font-mono text-hd-orange">
+                      {log_unit(@app, @runtime_logs)}
+                    </span>
+                    on {@app.server.name}.
+                  </p>
+                </div>
+                <button
+                  id="refresh-app-logs"
+                  type="button"
+                  phx-click="refresh_logs"
+                  phx-disable-with="Reading…"
+                  class="paas-btn-secondary text-[10px]"
+                >
+                  <.icon name="hero-arrow-path" class="size-3.5" /> Refresh
+                </button>
+              </div>
+
+              <div
+                :if={@logs_error}
+                class="rounded border border-rose-500/40 bg-rose-500/10 px-3 py-2 font-mono text-[11px] text-rose-400"
+              >
+                {@logs_error}
+              </div>
+
+              <div class="overflow-hidden rounded-md border border-hd-border bg-hd-bg font-mono text-[11px] text-hd-text">
+                <div class="flex items-center justify-between border-b border-hd-border bg-hd-aside px-3 py-1.5">
+                  <div class="flex items-center gap-1.5">
+                    <.icon name="hero-command-line" class="size-3.5 text-hd-orange" />
+                    <span class="text-[10px] font-semibold tracking-wider text-hd-muted">
+                      SYSTEMD JOURNAL
+                    </span>
+                  </div>
+                  <span :if={@runtime_logs} class="font-mono text-[10px] text-hd-muted">
+                    {Calendar.strftime(@runtime_logs.fetched_at, "%Y-%m-%d %H:%M:%S UTC")}
+                  </span>
+                </div>
+                <div
+                  id="app-runtime-logs-body"
+                  phx-hook=".LogsScroll"
+                  class="h-96 overflow-auto p-3 font-mono text-[11px] leading-5"
+                >
+                  <div
+                    :if={is_nil(@runtime_logs) and is_nil(@logs_error)}
+                    class="text-hd-muted"
+                  >
+                    Reading journal…
+                  </div>
+                  <div
+                    :if={@runtime_logs && @runtime_logs.lines == []}
+                    class="text-hd-muted"
+                  >
+                    No journal entries for this unit yet.
+                  </div>
+                  <div
+                    :for={{line, index} <- log_lines(@runtime_logs)}
+                    id={"log-line-#{index + 1}"}
+                    class="flex items-start"
+                  >
+                    <span class="sticky left-0 z-10 mr-3 w-8 shrink-0 select-none bg-hd-bg pr-1 text-right tabular-nums text-hd-muted/40">
+                      {index + 1}
+                    </span>
+                    <span class={["min-w-0 whitespace-pre", log_line_class(line)]}>{line}</span>
+                  </div>
+                  <script :type={Phoenix.LiveView.ColocatedHook} name=".LogsScroll">
+                    export default {
+                      mounted() { this.el.scrollTop = this.el.scrollHeight },
+                      updated() { this.el.scrollTop = this.el.scrollHeight }
+                    }
+                  </script>
+                </div>
+              </div>
             </div>
 
             <div :if={@app_detail_tab == :environment} id="app-env-vars" class="space-y-3">
@@ -251,10 +358,6 @@ defmodule PhoenixPaasWeb.AppLive.Show do
     """
   end
 
-  defp active_deployment?(deployments) do
-    Enum.any?(deployments, &(&1.status in [:queued, :running]))
-  end
-
   defp schedule_poll(socket, true) do
     Process.send_after(self(), :poll_deployments, @poll_ms)
     socket
@@ -264,5 +367,51 @@ defmodule PhoenixPaasWeb.AppLive.Show do
 
   defp webhook_url do
     PhoenixPaasWeb.Endpoint.url() <> "/webhooks/github"
+  end
+
+  defp maybe_load_logs(socket, :logs) do
+    if connected?(socket), do: load_logs(socket), else: socket
+  end
+
+  defp maybe_load_logs(socket, _tab), do: socket
+
+  defp load_logs(socket) do
+    case RuntimeLogs.fetch(socket.assigns.app) do
+      {:ok, result} ->
+        socket
+        |> assign(:runtime_logs, result)
+        |> assign(:logs_error, nil)
+
+      {:error, message} ->
+        socket
+        |> assign(:runtime_logs, nil)
+        |> assign(:logs_error, message)
+    end
+  end
+
+  defp log_unit(_app, %{unit: unit}), do: unit
+
+  defp log_unit(app, _) do
+    app.systemd_unit || Apps.App.default_systemd_unit(app.slug, app.runtime || "phoenix")
+  end
+
+  defp log_lines(%{lines: lines}) when is_list(lines),
+    do: Enum.with_index(lines)
+
+  defp log_lines(_), do: []
+
+  defp log_line_class(line) do
+    down = String.downcase(line)
+
+    cond do
+      String.contains?(down, "error") or String.contains?(down, "fail") ->
+        "text-rose-400"
+
+      String.contains?(down, "warn") ->
+        "text-hd-orange"
+
+      true ->
+        "text-hd-text"
+    end
   end
 end

@@ -26,9 +26,9 @@ defmodule PhoenixPaas.Deploy.TargetTest do
 
   test "ssh_host_ip/2 uses the DNS A record when it differs from the stored IP", %{scope: scope} do
     server = TenancyFixtures.server_fixture(scope, %{host_ip: "52.0.157.89"})
-    app = TenancyFixtures.app_fixture(scope, server, %{host: "campanha.gestaobem.com"})
+    app = TenancyFixtures.app_fixture(scope, server, %{host: "app.gestaobem.com"})
 
-    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "campanha.gestaobem.com" ->
+    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "app.gestaobem.com" ->
       {:ok, ["52.73.89.19"]}
     end)
 
@@ -48,9 +48,9 @@ defmodule PhoenixPaas.Deploy.TargetTest do
 
   test "sync_server_host_ip/2 persists when DNS IP differs and no apps conflict", %{scope: scope} do
     server = TenancyFixtures.server_fixture(scope, %{host_ip: "52.0.157.89"})
-    _app = TenancyFixtures.app_fixture(scope, server, %{host: "campanha.gestaobem.com"})
+    _app = TenancyFixtures.app_fixture(scope, server, %{host: "app.gestaobem.com"})
 
-    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "campanha.gestaobem.com" ->
+    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "app.gestaobem.com" ->
       {:ok, ["52.73.89.19"]}
     end)
 
@@ -64,11 +64,11 @@ defmodule PhoenixPaas.Deploy.TargetTest do
     server = TenancyFixtures.server_fixture(scope, %{name: "stale-vm", host_ip: "52.0.157.89"})
 
     TenancyFixtures.app_fixture(scope, server, %{
-      host: "campanha.gestaobem.com",
-      github_repo: "owner/campanha-#{System.unique_integer()}"
+      host: "app.gestaobem.com",
+      github_repo: "owner/app-#{System.unique_integer()}"
     })
 
-    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "campanha.gestaobem.com" ->
+    expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "app.gestaobem.com" ->
       {:ok, ["52.73.89.19"]}
     end)
 

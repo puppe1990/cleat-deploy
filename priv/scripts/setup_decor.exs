@@ -3,7 +3,6 @@
 #   GITHUB_TOKEN=... DEPLOY_RUNNER=ssh mix run --no-start priv/scripts/setup_decor.exs
 #
 # Important: DNS for decor.gestaobem.com must match DECOR_SERVER_IP (default 52.73.89.19).
-# Do not point the app at campanha-lightsail unless DNS is moved there.
 
 for app <- [:crypto, :ecto_sql, :ecto_sqlite3, :cloak, :cloak_ecto, :finch, :req] do
   {:ok, _} = Application.ensure_all_started(app)
@@ -49,7 +48,7 @@ ssh_key =
 
 ssh_key =
   ssh_key ||
-    case Repo.one(from s in Servers.Server, where: s.name == "campanha-lightsail", limit: 1) do
+    case Repo.one(from s in Servers.Server, where: s.name == "gestaobem-cx33", limit: 1) do
       %Servers.Server{ssh_private_key_encrypted: key} when is_binary(key) and key != "" -> key
       _ -> nil
     end

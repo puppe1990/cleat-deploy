@@ -99,20 +99,33 @@ defmodule PhoenixPaas.Seeds do
       release_path: "/opt/phoenix_tts"
     })
 
-    seed_app(scope, server, tenant_id, %{
-      name: "VipTravel",
-      slug: "controle-agente-viagens",
-      github_repo: "puppe1990/controle-agente-viagens",
-      branch: "main",
-      host: "vip.gestaobem.com",
-      port: 4007,
-      systemd_unit: "controle_agente_viagens",
-      release_path: "/opt/controle_agente_viagens_phx"
-    })
-
     catalog_server = maybe_seed_catalog(scope, tenant_id, opts)
-    campanha_server = maybe_seed_campanha(scope, tenant_id, opts)
     hetzner_server = maybe_seed_hetzner(scope, tenant_id, opts)
+
+    if hetzner_server do
+      seed_app(scope, hetzner_server, tenant_id, %{
+        name: "CLARITY AI",
+        slug: "assistente",
+        github_repo: "puppe1990/assistente-ia",
+        branch: "main",
+        host: "clarity.gestaobem.com",
+        port: 4013,
+        systemd_unit: "assistente",
+        release_path: "/opt/assistente"
+      })
+
+      seed_app(scope, hetzner_server, tenant_id, %{
+        name: "GitHub Projects",
+        slug: "github-projects",
+        github_repo: "puppe1990/github-projects-viewer-cais",
+        branch: "main",
+        host: "github.gestaobem.com",
+        port: 4021,
+        runtime: "golang",
+        systemd_unit: "github-projects",
+        release_path: "/opt/github-projects"
+      })
+    end
 
     {:ok,
      %{
@@ -120,7 +133,6 @@ defmodule PhoenixPaas.Seeds do
        scope: scope,
        server: server,
        catalog_server: catalog_server,
-       campanha_server: campanha_server,
        hetzner_server: hetzner_server
      }}
   end
@@ -137,43 +149,6 @@ defmodule PhoenixPaas.Seeds do
       nil ->
         {:ok, server} = Servers.create_server(scope, shared_server_seed_attrs(opts))
         server
-    end
-  end
-
-  defp maybe_seed_campanha(scope, tenant_id, opts) do
-    case campanha_server_ip(opts) do
-      nil ->
-        nil
-
-      host_ip ->
-        campanha_server =
-          case Repo.one(
-                 from s in Servers.Server,
-                   where: s.tenant_id == ^tenant_id and s.name == "campanha-lightsail",
-                   limit: 1
-               ) do
-            %Servers.Server{} = existing ->
-              maybe_update_campanha_server(existing, host_ip, opts)
-
-            nil ->
-              {:ok, server} =
-                Servers.create_server(scope, campanha_server_seed_attrs(host_ip, opts))
-
-              server
-          end
-
-        seed_app(scope, campanha_server, tenant_id, %{
-          name: "Campanha",
-          slug: "campanha",
-          github_repo: "puppe1990/campanha-ops",
-          branch: "main",
-          host: "campanha.gestaobem.com",
-          port: 4000,
-          systemd_unit: "campanha",
-          release_path: "/opt/campanha"
-        })
-
-        campanha_server
     end
   end
 
@@ -211,20 +186,6 @@ defmodule PhoenixPaas.Seeds do
         })
 
         catalog_server
-    end
-  end
-
-  defp maybe_update_campanha_server(%Servers.Server{} = server, host_ip, opts) do
-    changes =
-      %{host_ip: host_ip, deploy_mode: "dedicated", aws_instance_name: "campanha-lightsail"}
-      |> maybe_put_ssh_key_attr(opts)
-
-    if Enum.any?(changes, fn {key, value} -> Map.get(server, key) != value end) do
-      server
-      |> Servers.Server.changeset(changes)
-      |> Repo.update!()
-    else
-      server
     end
   end
 
@@ -293,22 +254,6 @@ defmodule PhoenixPaas.Seeds do
       region: "us-east-1",
       deploy_mode: "shared",
       aws_instance_name: "trip-lightsail"
-    }
-
-    case read_ssh_key(opts) do
-      nil -> attrs
-      key -> Map.put(attrs, :ssh_private_key, key)
-    end
-  end
-
-  defp campanha_server_seed_attrs(host_ip, opts) do
-    attrs = %{
-      name: "campanha-lightsail",
-      host_ip: host_ip,
-      ssh_user: "ubuntu",
-      region: "us-east-1",
-      deploy_mode: "dedicated",
-      aws_instance_name: "campanha-lightsail"
     }
 
     case read_ssh_key(opts) do
@@ -388,11 +333,6 @@ defmodule PhoenixPaas.Seeds do
       System.get_env("HETZNER_SERVER_IP")
   end
 
-  defp campanha_server_ip(opts) do
-    Keyword.get(opts, :campanha_server_ip) ||
-      System.get_env("CAMPANHA_SERVER_IP")
-  end
-
   defp maybe_backfill_server_ssh_key(%Servers.Server{} = server, opts) do
     if Servers.ssh_key_configured?(server) do
       server
@@ -434,6 +374,7 @@ defmodule PhoenixPaas.Seeds do
       :branch,
       :host,
       :port,
+      :runtime,
       :systemd_unit,
       :release_path
     ])

@@ -12,6 +12,8 @@ defmodule PhoenixPaas.AWS.Lightsail do
   @callback get_instance(region(), instance_name()) ::
               {:ok, InstanceSpec.t()} | {:error, term()}
 
+  @callback list_instances(region()) :: {:ok, [InstanceSpec.t()]} | {:error, term()}
+
   @callback list_bundles(region()) :: {:ok, [Bundle.t()]} | {:error, term()}
 
   @callback change_bundle(region(), instance_name(), bundle_id()) :: :ok | {:error, term()}
@@ -22,6 +24,10 @@ defmodule PhoenixPaas.AWS.Lightsail do
 
   def get_instance(region, instance_name) do
     client().get_instance(region, instance_name)
+  end
+
+  def list_instances(region) do
+    client().list_instances(region)
   end
 
   def list_bundles(region) do

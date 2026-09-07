@@ -22,7 +22,8 @@ ATELIE_IP="${ATELIE_SERVER_IP:-3.211.110.141}"
 SSH_KEY="${DEPLOY_SSH_KEY:-$HOME/.ssh/lightsail-default-key-us-east-1.pem}"
 SSH_USER="${DEPLOY_USER:-ubuntu}"
 
-PHOENIX_APPS=(assistente campanha catalog_platform festa_platform open_drive pay_core phoenix_paas vexo)
+# phoenix_paas is built separately on the CX33 — do not overwrite it with the Lightsail release.
+PHOENIX_APPS=(assistente catalog_platform festa_platform open_drive pay_core vexo)
 GO_APPS_CATALOGO=(leilao-erp trama-bras)
 GO_APPS_ATELIE=(atelie)
 
@@ -66,6 +67,18 @@ enable_unit() {
   ssh_dst "sudo systemctl daemon-reload && sudo systemctl enable --now $unit || true"
 }
 
+copy_sqlite() {
+  local src_ip="$1" db_path="$2"
+  if ! ssh_src "$src_ip" "sudo test -f $db_path"; then
+    return 0
+  fi
+  log "sqlite snapshot $src_ip:$db_path"
+  ssh_src "$src_ip" "sudo apt-get -qq install -y sqlite3 >/dev/null 2>&1 || true; sudo sqlite3 $db_path \".backup '/tmp/paas_sqlite.bak'\""
+  ssh_dst "sudo mkdir -p $(dirname "$db_path")"
+  ssh_src "$src_ip" "sudo cat /tmp/paas_sqlite.bak" | ssh_dst "sudo dd of=$db_path status=none"
+  ssh_src "$src_ip" "sudo rm -f /tmp/paas_sqlite.bak"
+}
+
 main() {
   log "Migrating Lightsail workloads to Hetzner $HETZNER_IP"
 
@@ -79,8 +92,16 @@ main() {
       copy_path "$CATALOGO_IP" "/var/lib/$app" "/var/lib/$app"
     fi
     ssh_dst "sudo chmod 600 /etc/$app/env"
+    copy_sqlite "$CATALOGO_IP" "/var/lib/$app/${app}.db"
+    copy_sqlite "$CATALOGO_IP" "/var/lib/$app/${app}_prod.db"
+    copy_sqlite "$CATALOGO_IP" "/var/lib/$app/replica.db"
     enable_unit "$app"
   done
+
+  copy_sqlite "$CATALOGO_IP" "/var/lib/festa_platform/festa_platform_prod.db"
+  copy_sqlite "$CATALOGO_IP" "/var/lib/pay_core/pay_core.db"
+  copy_sqlite "$CATALOGO_IP" "/var/lib/vexo/vexo.db"
+  copy_sqlite "$CATALOGO_IP" "/var/lib/assistente/replica.db"
 
   for app in "${GO_APPS_CATALOGO[@]}"; do
     copy_path "$CATALOGO_IP" "/opt/$app" "/opt/$app"
@@ -90,6 +111,8 @@ main() {
       copy_path "$CATALOGO_IP" "/var/lib/$app" "/var/lib/$app"
     fi
     ssh_dst "sudo chmod 600 /etc/$app/env"
+    copy_sqlite "$CATALOGO_IP" "/opt/$app/data/app.db"
+    copy_sqlite "$CATALOGO_IP" "/var/lib/$app/app.db"
     enable_unit "$app"
   done
 
@@ -101,6 +124,7 @@ main() {
       copy_file "$ATELIE_IP" "/etc/systemd/system/${app}-worker.service" "/etc/systemd/system/${app}-worker.service"
     fi
     ssh_dst "sudo chmod 600 /etc/$app/env"
+    copy_sqlite "$ATELIE_IP" "/opt/$app/data/app.db"
     # Dedicated Ateliê used :8080; Leilão ERP already occupies 8080 on the shared host.
     ssh_dst "sudo sed -i 's/^PORT=.*/PORT=:4020/' /etc/atelie/env"
     enable_unit "$app"
@@ -132,7 +156,6 @@ Update these A records to $HETZNER_IP:
   vexo.gestaobem.com
   decor.gestaobem.com
   pay.gestaobem.com
-  campanha.gestaobem.com
   drive.gestaobem.com
   clarity.gestaobem.com
   atelie.gestaobem.com

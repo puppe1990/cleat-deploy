@@ -20,6 +20,32 @@ defmodule PhoenixPaas.Apps do
     )
   end
 
+  def list_app_choices(%Scope{tenant: tenant}) do
+    Repo.all(
+      from a in App,
+        where: a.tenant_id == ^tenant.id,
+        order_by: [asc: a.name],
+        select: struct(a, [:id, :name, :branch])
+    )
+  end
+
+  def count_apps(%Scope{tenant: tenant}) do
+    Repo.aggregate(from(a in App, where: a.tenant_id == ^tenant.id), :count, :id)
+  end
+
+  def count_by_runtime(%Scope{tenant: tenant}) do
+    from(a in App,
+      where: a.tenant_id == ^tenant.id,
+      group_by: a.runtime,
+      select: {a.runtime, count(a.id)}
+    )
+    |> Repo.all()
+    |> Enum.reduce(%{elixir: 0, go: 0}, fn
+      {"golang", n}, acc -> %{acc | go: n}
+      {_runtime, n}, acc -> %{acc | elixir: acc.elixir + n}
+    end)
+  end
+
   def get_app!(id) when is_integer(id) do
     Repo.get!(App, id) |> Repo.preload([:server, :env_vars])
   end
@@ -44,6 +70,16 @@ defmodule PhoenixPaas.Apps do
     Repo.all(from a in App, order_by: [asc: a.slug], preload: [:server])
   end
 
+  def count_apps_by_server_id(%Scope{tenant: tenant}) do
+    from(a in App,
+      where: a.tenant_id == ^tenant.id,
+      group_by: a.server_id,
+      select: {a.server_id, count(a.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   def create_app(%Scope{tenant: tenant}, attrs) do
     attrs = Map.put(stringify_keys(attrs), "tenant_id", tenant.id)
 
@@ -55,6 +91,17 @@ defmodule PhoenixPaas.Apps do
       {:ok, app, status}
     end
   end
+
+  @doc """
+  Deletes an app and its deployments/env vars. Best-effort removes the GitHub webhook.
+  """
+  def delete_app(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app)
+      when tenant_id == tenant.id do
+    _ = Github.delete_webhook(app)
+    Repo.delete(app)
+  end
+
+  def delete_app(%Scope{}, %App{}), do: {:error, :unauthorized}
 
   @doc """
   Provisions (or updates) the GitHub push webhook for an app.

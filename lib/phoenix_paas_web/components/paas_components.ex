@@ -6,7 +6,51 @@ defmodule PhoenixPaasWeb.PaasComponents do
 
   import PhoenixPaasWeb.CoreComponents, only: [icon: 1]
 
+  alias PhoenixPaas.Apps.App
+
   @repo_picker_limit 50
+
+  attr :app, App, required: true
+
+  def language_badge(assigns) do
+    language = App.main_language(assigns.app)
+    golang? = assigns.app.runtime == "golang"
+
+    assigns = assign(assigns, language: language, golang?: golang?)
+
+    ~H"""
+    <span
+      id={"app-#{@app.id}-language"}
+      class={[
+        "inline-flex items-center rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide",
+        @golang? && "border-hd-green/40 bg-hd-green/10 text-hd-green",
+        not @golang? && "border-hd-orange/40 bg-hd-orange/10 text-hd-orange"
+      ]}
+    >
+      {@language}
+    </span>
+    """
+  end
+
+  attr :app, App, required: true
+  attr :memory, :any, default: nil
+
+  def ram_cell(assigns) do
+    peak = PhoenixPaas.Apps.RuntimeMemory.format_peak(assigns.memory)
+
+    assigns =
+      assign(assigns, peak: peak, label: PhoenixPaas.Apps.RuntimeMemory.format(assigns.memory))
+
+    ~H"""
+    <span
+      id={"app-#{@app.id}-ram"}
+      class="font-mono text-sm tabular-nums text-hd-text"
+      title={@peak}
+    >
+      {@label}
+    </span>
+    """
+  end
 
   attr :status, :atom, required: true
 
@@ -112,6 +156,429 @@ defmodule PhoenixPaasWeb.PaasComponents do
     """
   end
 
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :current, :string, default: nil
+  attr :hint, :string, default: nil
+  attr :series, :list, default: []
+  attr :color, :string, default: "var(--color-hd-orange)"
+
+  def area_chart(assigns) do
+    {fill, line} = series_paths(assigns.series, 400, 128)
+    points = hover_points(assigns.series, 400, &format_cpu/1)
+    assigns = assign(assigns, fill: fill, line: line, points: points)
+
+    ~H"""
+    <section id={@id} class="paas-card p-4">
+      <div class="flex items-baseline justify-between gap-3">
+        <div>
+          <h3 class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+            {@title}
+          </h3>
+          <p :if={@hint} class="text-[11px] text-hd-muted">{@hint}</p>
+        </div>
+        <p :if={@current} class="font-mono text-lg font-semibold tabular-nums text-hd-text">
+          {@current}
+        </p>
+      </div>
+      <.chart_hover_layer
+        :if={@line != ""}
+        id={"#{@id}-plot"}
+        points={@points}
+        view_width={400}
+      >
+        <svg viewBox="0 0 400 128" class="h-28 w-full overflow-visible" role="img" aria-label={@title}>
+          <path d={@fill} fill={@color} fill-opacity="0.16" />
+          <path d={@line} fill="none" stroke={@color} stroke-width="2" stroke-linejoin="round" />
+          <rect x="0" y="0" width="400" height="128" fill="transparent" class="cursor-crosshair" />
+        </svg>
+      </.chart_hover_layer>
+      <p :if={@line == ""} class="mt-8 text-center font-mono text-[11px] text-hd-muted">
+        No samples yet
+      </p>
+    </section>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :current, :string, default: nil
+  attr :hint, :string, default: nil
+  attr :inbound, :list, default: []
+  attr :outbound, :list, default: []
+
+  def dual_line_chart(assigns) do
+    max_v =
+      (assigns.inbound ++ assigns.outbound)
+      |> Enum.map(& &1.v)
+      |> Enum.max(fn -> 1.0 end)
+      |> max(1.0)
+
+    {_fill_in, line_in} = series_paths(assigns.inbound, 400, 128, max_v)
+    {_fill_out, line_out} = series_paths(assigns.outbound, 400, 128, max_v)
+    points = dual_hover_points(assigns.inbound, assigns.outbound, 400)
+
+    assigns = assign(assigns, line_in: line_in, line_out: line_out, points: points)
+
+    ~H"""
+    <section id={@id} class="paas-card p-4">
+      <div class="flex items-baseline justify-between gap-3">
+        <div>
+          <h3 class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+            {@title}
+          </h3>
+          <p :if={@hint} class="text-[11px] text-hd-muted">{@hint}</p>
+        </div>
+        <p :if={@current} class="font-mono text-sm font-semibold tabular-nums text-hd-text">
+          {@current}
+        </p>
+      </div>
+      <.chart_hover_layer
+        :if={@line_in != "" or @line_out != ""}
+        id={"#{@id}-plot"}
+        points={@points}
+        view_width={400}
+      >
+        <svg viewBox="0 0 400 128" class="h-28 w-full overflow-visible" role="img" aria-label={@title}>
+          <path
+            :if={@line_in != ""}
+            d={@line_in}
+            fill="none"
+            stroke="var(--color-hd-orange)"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+          <path
+            :if={@line_out != ""}
+            d={@line_out}
+            fill="none"
+            stroke="var(--color-hd-green)"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+          <rect x="0" y="0" width="400" height="128" fill="transparent" class="cursor-crosshair" />
+        </svg>
+      </.chart_hover_layer>
+      <div class="mt-2 flex gap-3 font-mono text-[10px] text-hd-muted">
+        <span class="inline-flex items-center gap-1">
+          <span class="size-1.5 rounded-full bg-hd-orange" /> In
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="size-1.5 rounded-full bg-hd-green" /> Out
+        </span>
+      </div>
+      <p
+        :if={@line_in == "" and @line_out == ""}
+        class="mt-8 text-center font-mono text-[11px] text-hd-muted"
+      >
+        No samples yet
+      </p>
+    </section>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :elixir, :integer, required: true
+  attr :go, :integer, required: true
+
+  def runtime_bars(assigns) do
+    total = max(assigns.elixir + assigns.go, 1)
+    elixir_pct = round(assigns.elixir / total * 100)
+    go_pct = round(assigns.go / total * 100)
+
+    assigns =
+      assign(assigns, elixir_pct: elixir_pct, go_pct: go_pct, total: assigns.elixir + assigns.go)
+
+    ~H"""
+    <section id={@id} class="paas-card p-4">
+      <h3 class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+        Apps by language
+      </h3>
+      <p class="text-[11px] text-hd-muted">{@total} registered on this tenant</p>
+      <div class="mt-5 space-y-4">
+        <div>
+          <div class="mb-1 flex items-center justify-between font-mono text-[11px]">
+            <span class="text-hd-orange">Elixir</span>
+            <span class="tabular-nums text-hd-text">{@elixir}</span>
+          </div>
+          <div class="group relative h-2 overflow-visible rounded-full bg-hd-aside">
+            <div class="h-2 rounded-full bg-hd-orange" style={"width: #{@elixir_pct}%"} />
+            <span class="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded border border-hd-border bg-hd-card px-2 py-0.5 font-mono text-[10px] text-hd-text shadow-lg group-hover:block">
+              {@elixir} apps · {@elixir_pct}%
+            </span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between font-mono text-[11px]">
+            <span class="text-hd-green">Go</span>
+            <span class="tabular-nums text-hd-text">{@go}</span>
+          </div>
+          <div class="group relative h-2 overflow-visible rounded-full bg-hd-aside">
+            <div class="h-2 rounded-full bg-hd-green" style={"width: #{@go_pct}%"} />
+            <span class="pointer-events-none absolute -top-7 left-1/2 hidden -translate-x-1/2 rounded border border-hd-border bg-hd-card px-2 py-0.5 font-mono text-[10px] text-hd-text shadow-lg group-hover:block">
+              {@go} apps · {@go_pct}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :days, :list, required: true
+
+  def deploy_bars(assigns) do
+    max_v =
+      assigns.days
+      |> Enum.map(&(&1.success + &1.failed))
+      |> Enum.max(fn -> 1 end)
+      |> max(1)
+
+    bar_w = 18
+    gap = 2
+    width = max(length(assigns.days) * (bar_w + gap), 1)
+    height = 112
+
+    bars =
+      Enum.with_index(assigns.days, fn day, i ->
+        x = i * (bar_w + gap)
+        total = day.success + day.failed
+        total_h = total / max_v * (height - 16)
+        fail_h = if total == 0, do: 0, else: day.failed / max_v * (height - 16)
+        success_h = total_h - fail_h
+        y_fail = height - 14 - fail_h
+        y_ok = y_fail - success_h
+
+        %{
+          x: x,
+          fail_h: fail_h,
+          success_h: success_h,
+          y_fail: y_fail,
+          y_ok: y_ok,
+          label: day.label,
+          date: day.date,
+          success: day.success,
+          failed: day.failed
+        }
+      end)
+
+    points =
+      Enum.map(bars, fn bar ->
+        %{
+          x: bar.x + bar_w / 2,
+          label: bar.date,
+          lines: ["#{bar.success} success", "#{bar.failed} failed"]
+        }
+      end)
+
+    assigns =
+      assign(assigns, bars: bars, width: width, height: height, bar_w: bar_w, points: points)
+
+    ~H"""
+    <section id={@id} class="paas-card p-4">
+      <h3 class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+        Deploys · 14 days
+      </h3>
+      <p class="text-[11px] text-hd-muted">Success vs failed across all apps</p>
+      <.chart_hover_layer id={"#{@id}-plot"} points={@points} view_width={@width}>
+        <svg
+          viewBox={"0 0 #{@width} #{@height}"}
+          class="h-28 w-full"
+          role="img"
+          aria-label="Deployments last 14 days"
+        >
+          <g :for={bar <- @bars}>
+            <rect
+              :if={bar.success_h > 0}
+              x={bar.x}
+              y={bar.y_ok}
+              width={@bar_w}
+              height={bar.success_h}
+              rx="2"
+              fill="var(--color-hd-green)"
+            />
+            <rect
+              :if={bar.fail_h > 0}
+              x={bar.x}
+              y={bar.y_fail}
+              width={@bar_w}
+              height={bar.fail_h}
+              rx="2"
+              fill="#f85149"
+            />
+            <rect
+              x={bar.x}
+              y="0"
+              width={@bar_w}
+              height={@height - 14}
+              fill="transparent"
+              class="cursor-crosshair"
+            />
+            <text
+              x={bar.x + @bar_w / 2}
+              y={@height - 2}
+              text-anchor="middle"
+              class="fill-current text-[7px] text-hd-muted"
+            >
+              {bar.label}
+            </text>
+          </g>
+        </svg>
+      </.chart_hover_layer>
+      <div class="mt-1 flex gap-3 font-mono text-[10px] text-hd-muted">
+        <span class="inline-flex items-center gap-1">
+          <span class="size-1.5 rounded-full bg-hd-green" /> Success
+        </span>
+        <span class="inline-flex items-center gap-1">
+          <span class="size-1.5 rounded-full bg-rose-500" /> Failed
+        </span>
+      </div>
+    </section>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :points, :list, required: true
+  attr :view_width, :integer, required: true
+  slot :inner_block, required: true
+
+  defp chart_hover_layer(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="ChartTip"
+      data-points={Jason.encode!(@points)}
+      data-view-width={@view_width}
+      class="relative mt-3"
+    >
+      {render_slot(@inner_block)}
+      <div
+        data-chart-line
+        class="pointer-events-none absolute top-0 hidden h-[calc(100%-0.25rem)] w-px bg-hd-text/35"
+      >
+      </div>
+      <div
+        data-chart-tip
+        class="pointer-events-none absolute top-1 z-20 hidden min-w-28 rounded border border-hd-border bg-hd-card px-2 py-1.5 shadow-lg"
+      >
+        <p data-chart-tip-label class="font-mono text-[10px] text-hd-muted"></p>
+        <p
+          data-chart-tip-value
+          class="whitespace-pre-line font-mono text-[11px] font-semibold tabular-nums text-hd-text"
+        >
+        </p>
+      </div>
+    </div>
+    """
+  end
+
+  defp hover_points(series, w, formatter) when is_list(series) and length(series) >= 2 do
+    n = length(series)
+    step = w / (n - 1)
+
+    Enum.with_index(series, fn point, i ->
+      %{
+        x: Float.round(i * step, 1),
+        label: format_sample_time(Map.get(point, :t)),
+        lines: [formatter.(point.v)]
+      }
+    end)
+  end
+
+  defp hover_points(_, _, _), do: []
+
+  defp dual_hover_points(inbound, outbound, w)
+       when is_list(inbound) and is_list(outbound) and inbound != [] and outbound != [] do
+    pairs = Enum.zip(inbound, outbound)
+    n = length(pairs)
+
+    if n < 2 do
+      []
+    else
+      step = w / (n - 1)
+
+      Enum.with_index(pairs, fn {incoming, outgoing}, i ->
+        %{
+          x: Float.round(i * step, 1),
+          label: format_sample_time(Map.get(incoming, :t) || Map.get(outgoing, :t)),
+          lines: ["In #{format_bps(incoming.v)}", "Out #{format_bps(outgoing.v)}"]
+        }
+      end)
+    end
+  end
+
+  defp dual_hover_points(_, _, _), do: []
+
+  defp format_sample_time(t) when is_integer(t) do
+    case DateTime.from_unix(t) do
+      {:ok, dt} -> Calendar.strftime(dt, "%H:%M UTC")
+      _ -> "—"
+    end
+  end
+
+  defp format_sample_time(_), do: "—"
+
+  defp format_cpu(nil), do: "—"
+
+  defp format_cpu(value) when is_number(value),
+    do: :erlang.float_to_binary(value / 1, decimals: 1) <> "%"
+
+  defp format_bps(nil), do: "—"
+
+  defp format_bps(v) when v >= 1_000_000,
+    do: :erlang.float_to_binary(v / 1_000_000, decimals: 1) <> " MB/s"
+
+  defp format_bps(v) when v >= 1_000,
+    do: :erlang.float_to_binary(v / 1_000, decimals: 1) <> " KB/s"
+
+  defp format_bps(v) when is_number(v), do: :erlang.float_to_binary(v / 1, decimals: 1) <> " B/s"
+
+  defp series_paths(series, w, h, max_v \\ nil)
+  defp series_paths(series, _w, _h, _max_v) when not is_list(series) or series == [], do: {"", ""}
+
+  defp series_paths(series, w, h, max_v) do
+    n = length(series)
+
+    if n < 2 do
+      {"", ""}
+    else
+      peak =
+        max_v ||
+          series
+          |> Enum.map(& &1.v)
+          |> Enum.max()
+          |> max(1.0)
+
+      pad = 4
+      usable = h - pad * 2
+      step = w / (n - 1)
+
+      pts =
+        series
+        |> Enum.with_index()
+        |> Enum.map(fn {%{v: v}, i} ->
+          x = Float.round(i * step, 1)
+          y = Float.round(pad + usable * (1 - v / peak), 1)
+          {x, y}
+        end)
+
+      [{x0, _} | _] = pts
+      {xn, _} = List.last(pts)
+
+      line =
+        pts
+        |> Enum.with_index()
+        |> Enum.map(fn {{x, y}, i} ->
+          if i == 0, do: "M #{x} #{y}", else: "L #{x} #{y}"
+        end)
+        |> Enum.join(" ")
+
+      fill = line <> " L #{xn} #{h} L #{x0} #{h} Z"
+      {fill, line}
+    end
+  end
+
   attr :id, :string, default: "deploy-terminal"
   attr :deployment, :map, required: true
   attr :active?, :boolean, default: false
@@ -146,14 +613,14 @@ defmodule PhoenixPaasWeb.PaasComponents do
       <div
         id="deploy-terminal-body"
         phx-hook=".TerminalScroll"
-        class="h-56 space-y-0.5 overflow-y-auto p-3 leading-normal"
+        class="h-56 overflow-auto p-3 font-mono text-[11px] leading-5"
       >
         <div :if={@lines == []} class="text-hd-muted">Waiting for build output…</div>
-        <div :for={{line, index} <- Enum.with_index(@lines)} class="flex">
-          <span class="mr-2.5 w-5 shrink-0 select-none text-right text-hd-muted/40">
+        <div :for={{line, index} <- Enum.with_index(@lines)} class="flex items-start">
+          <span class="sticky left-0 z-10 mr-3 w-8 shrink-0 select-none bg-hd-bg pr-1 text-right tabular-nums text-hd-muted/40">
             {String.pad_leading(Integer.to_string(index + 1), 2, "0")}
           </span>
-          <span class={terminal_line_class(line)}>{line}</span>
+          <span class={["min-w-0 whitespace-pre", terminal_line_class(line)]}>{line}</span>
         </div>
         <span :if={@active?} class="ml-8 inline-block h-3 w-1 animate-pulse bg-hd-orange" />
         <script :type={Phoenix.LiveView.ColocatedHook} name=".TerminalScroll">
@@ -315,13 +782,14 @@ defmodule PhoenixPaasWeb.PaasComponents do
   end
 
   attr :label, :string, required: true
+  attr :id, :string, default: nil
   attr :value, :string, required: true
   attr :mono, :boolean, default: false
   attr :sub, :string, default: nil
 
   def info_tile(assigns) do
     ~H"""
-    <div class="paas-card flex flex-col justify-between space-y-1 p-3">
+    <div id={@id} class="paas-card flex flex-col justify-between space-y-1 p-3">
       <span class="font-mono text-[9px] font-bold uppercase tracking-widest text-hd-muted">
         {@label}
       </span>

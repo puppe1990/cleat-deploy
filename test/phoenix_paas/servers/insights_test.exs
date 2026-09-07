@@ -1,0 +1,58 @@
+defmodule PhoenixPaas.Servers.InsightsTest do
+  use PhoenixPaas.DataCase, async: false
+
+  alias PhoenixPaas.Deployments
+  alias PhoenixPaas.Servers.Insights
+  alias PhoenixPaas.TenancyFixtures
+
+  setup do
+    scope = TenancyFixtures.scope_fixture()
+    server = TenancyFixtures.server_fixture(scope, %{name: "gestaobem-cx33"})
+    %{scope: scope, server: server}
+  end
+
+  test "counts apps by runtime for the tenant", %{scope: scope, server: server} do
+    TenancyFixtures.app_fixture(scope, server, %{runtime: "phoenix", slug: "a1", name: "A1"})
+    TenancyFixtures.app_fixture(scope, server, %{runtime: "phoenix", slug: "a2", name: "A2"})
+    TenancyFixtures.app_fixture(scope, server, %{runtime: "golang", slug: "g1", name: "G1"})
+
+    snapshot = Insights.snapshot(scope)
+    assert snapshot.runtimes.elixir == 2
+    assert snapshot.runtimes.go == 1
+    assert snapshot.server.id == server.id
+  end
+
+  test "buckets deployments by day and status", %{scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, queued} = Deployments.create_deployment(app, %{git_sha: "ok"})
+    {:ok, running} = Deployments.mark_running(queued)
+    {:ok, _} = Deployments.mark_success(running, "ok")
+
+    {:ok, failed_q} = Deployments.create_deployment(app, %{git_sha: "bad"})
+    {:ok, _} = Deployments.mark_failed(failed_q, "boom")
+
+    snapshot = Insights.snapshot(scope)
+    today = List.last(snapshot.deploys)
+
+    assert today.success >= 1
+    assert today.failed >= 1
+    assert length(snapshot.deploys) == 14
+  end
+
+  test "does not include other tenant apps", %{scope: scope, server: server} do
+    TenancyFixtures.app_fixture(scope, server, %{runtime: "golang", slug: "mine", name: "Mine"})
+    other = TenancyFixtures.scope_fixture()
+    other_server = TenancyFixtures.server_fixture(other)
+
+    TenancyFixtures.app_fixture(other, other_server, %{
+      runtime: "golang",
+      slug: "theirs",
+      name: "Theirs"
+    })
+
+    snapshot = Insights.snapshot(scope)
+    assert snapshot.runtimes.go == 1
+    assert snapshot.runtimes.elixir == 0
+  end
+end

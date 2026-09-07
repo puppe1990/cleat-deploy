@@ -11,10 +11,18 @@ defmodule PhoenixPaas.AWS.Lightsail.ExAwsClient do
 
   @impl true
   def get_instance(region, instance_name) do
-    with {:ok, %{"instance" => instance}} <-
-           request(region, "GetInstance", %{instanceName: instance_name}) do
-      {:ok, map_instance(instance)}
+    case request(region, "GetInstance", %{instanceName: instance_name}) do
+      {:ok, %{"instance" => instance}} ->
+        {:ok, map_instance(instance, region)}
+
+      {:error, reason} ->
+        {:error, normalize_error(reason)}
     end
+  end
+
+  @impl true
+  def list_instances(region) do
+    fetch_instances(region, nil, [])
   end
 
   @impl true
@@ -85,7 +93,33 @@ defmodule PhoenixPaas.AWS.Lightsail.ExAwsClient do
     }
   end
 
-  defp map_instance(instance) do
+  defp fetch_instances(region, page_token, acc) do
+    params =
+      if is_binary(page_token) and page_token != "" do
+        %{pageToken: page_token}
+      else
+        %{}
+      end
+
+    case request(region, "GetInstances", params) do
+      {:ok, body} ->
+        instances = Enum.map(body["instances"] || [], &map_instance(&1, region))
+        acc = acc ++ instances
+
+        case body["nextPageToken"] do
+          token when is_binary(token) and token != "" ->
+            fetch_instances(region, token, acc)
+
+          _ ->
+            {:ok, acc}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp map_instance(instance, region) do
     bundle_id = instance["bundleId"]
     catalog = Catalog.find_bundle(bundle_id)
 
@@ -100,9 +134,26 @@ defmodule PhoenixPaas.AWS.Lightsail.ExAwsClient do
       disk_gb: disk_gb(instance) || (catalog && catalog.disk_gb) || 20,
       status: get_in(instance, ["state", "name"]) || "unknown",
       blueprint_name: instance["blueprintName"] || "—",
-      monthly_price_usd: (catalog && catalog.monthly_price_usd) || Decimal.new("0")
+      monthly_price_usd: (catalog && catalog.monthly_price_usd) || Decimal.new("0"),
+      name: instance["name"],
+      public_ip: instance["publicIpAddress"],
+      region: get_in(instance, ["location", "regionName"]) || region
     }
   end
+
+  defp normalize_error({:lightsail, status, body} = reason) when status in [400, 404] do
+    if not_found_body?(body), do: :not_found, else: reason
+  end
+
+  defp normalize_error(reason), do: reason
+
+  defp not_found_body?(body) when is_map(body) do
+    code = to_string(body["code"] || body["__type"] || "")
+    String.contains?(code, "NotFound")
+  end
+
+  defp not_found_body?(body) when is_binary(body), do: String.contains?(body, "NotFound")
+  defp not_found_body?(_), do: false
 
   defp map_bundle(bundle) do
     bundle_id = bundle["bundleId"]

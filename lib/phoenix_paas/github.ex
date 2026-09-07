@@ -86,6 +86,22 @@ defmodule PhoenixPaas.Github do
 
   def ensure_webhook(_), do: {:error, :invalid_app}
 
+  @doc """
+  Deletes the panel push webhook for an app repository, if one exists.
+  """
+  def delete_webhook(%{github_repo: repo}) when is_binary(repo) and repo != "" do
+    with {:ok, token} <- api_token(),
+         url <- webhook_url(),
+         {:ok, hooks} <- list_hooks(repo, token) do
+      case Enum.find(hooks, &(get_in(&1, ["config", "url"]) == url)) do
+        %{"id" => id} -> delete_hook(repo, id, token)
+        _ -> :ok
+      end
+    end
+  end
+
+  def delete_webhook(_), do: {:error, :invalid_app}
+
   defp list_repos(token, page, acc) do
     case api_get("/user/repos", token,
            per_page: 100,
@@ -122,6 +138,21 @@ defmodule PhoenixPaas.Github do
 
   defp update_hook(repo, hook_id, payload, token) do
     api_patch("/repos/#{repo_path(repo)}/hooks/#{hook_id}", token, payload)
+  end
+
+  defp delete_hook(repo, hook_id, token) do
+    case Req.delete("#{@github_api}/repos/#{repo_path(repo)}/hooks/#{hook_id}",
+           headers: api_headers(token)
+         ) do
+      {:ok, %{status: status}} when status in 200..299 ->
+        :ok
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, format_api_error(status, body)}
+
+      {:error, exception} ->
+        {:error, Exception.message(exception)}
+    end
   end
 
   defp hook_payload(url, secret) do

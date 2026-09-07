@@ -2,16 +2,30 @@ defmodule PhoenixPaasWeb.AppLive.Index do
   use PhoenixPaasWeb, :live_view
 
   alias PhoenixPaas.{Apps, Github, Servers}
-  alias PhoenixPaas.Apps.{App, Provisioning}
+  alias PhoenixPaas.Apps.{App, Provisioning, RuntimeMemory}
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Apps")
-     |> assign(:active_tab, :apps)
-     |> assign(:servers, Servers.list_servers(socket.assigns.current_scope))
-     |> stream(:apps, Apps.list_apps(socket.assigns.current_scope))}
+    apps = Apps.list_apps(socket.assigns.current_scope)
+
+    socket =
+      socket
+      |> assign(:page_title, "Apps")
+      |> assign(:active_tab, :apps)
+      |> assign(:servers, Servers.list_servers(socket.assigns.current_scope))
+      |> assign(:apps_list, apps)
+      |> assign(:app_memory, %{})
+      |> stream(:apps, apps)
+
+    socket =
+      if connected?(socket) do
+        send(self(), :load_app_memory)
+        socket
+      else
+        socket
+      end
+
+    {:ok, socket}
   end
 
   @impl true
@@ -95,6 +109,16 @@ defmodule PhoenixPaasWeb.AppLive.Index do
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign(socket, form: to_form(changeset))}
     end
+  end
+
+  @impl true
+  def handle_info(:load_app_memory, socket) do
+    memory = RuntimeMemory.for_apps(socket.assigns.apps_list)
+
+    {:noreply,
+     socket
+     |> assign(:app_memory, memory)
+     |> stream(:apps, socket.assigns.apps_list, reset: true)}
   end
 
   @impl true
@@ -278,49 +302,89 @@ defmodule PhoenixPaasWeb.AppLive.Index do
           </div>
         </div>
 
-        <div id="apps-list" phx-update="stream" class="space-y-3">
-          <div
-            id="apps-empty"
-            class="hidden only:block rounded-md border-2 border-dashed border-hd-border p-8 text-center text-hd-muted"
-          >
-            <p class="font-mono text-xs">
-              › No applications configured. Please create an application profile above.
-            </p>
+        <div class="overflow-hidden rounded-md border border-hd-border bg-hd-card">
+          <div class="flex items-center justify-between border-b border-hd-border bg-hd-aside px-4 py-2.5">
+            <div class="space-y-0.5">
+              <h3 class="font-display text-xs font-semibold text-hd-text">
+                Registered Phoenix Applications
+              </h3>
+              <p class="text-[11px] text-hd-muted">
+                Live directory mapping GitHub repositories to systemd processes
+              </p>
+            </div>
             <.link
               :if={@servers != []}
               navigate={~p"/apps/new"}
-              class="paas-btn-primary mt-4 inline-flex"
+              class="flex items-center gap-1 font-mono text-xs font-bold text-hd-orange hover:text-hd-orange-dark"
             >
-              Register App
+              <.icon name="hero-plus" class="size-3.5" /> Register App
             </.link>
           </div>
 
-          <div
-            :for={{id, app} <- @streams.apps}
-            id={id}
-            class="paas-card p-4 transition-all hover:border-hd-orange/30"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <.link
-                  navigate={~p"/apps/#{app.id}/deployments"}
-                  class="font-semibold text-hd-orange hover:text-hd-orange-dark"
-                >
-                  {app.name}
-                </.link>
-                <.link
-                  href={"https://#{app.host}"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="font-mono text-sm text-hd-orange hover:text-hd-orange-dark hover:underline"
-                >
-                  {app.host}
-                </.link>
-              </div>
-              <span class="rounded border border-hd-border bg-hd-bg px-2 py-0.5 font-mono text-[10px] text-hd-muted">
-                {app.server.name}
-              </span>
-            </div>
+          <div class="overflow-x-auto">
+            <table id="apps-table" class="paas-table w-full text-left">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Host</th>
+                  <th>Main language</th>
+                  <th>RAM</th>
+                  <th>Server</th>
+                  <th class="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="apps-list" phx-update="stream">
+                <tr id="apps-empty" class="hidden only:table-row">
+                  <td colspan="6" class="py-8 text-center text-hd-muted">
+                    <div class="space-y-3">
+                      <p class="font-mono text-xs">No applications configured.</p>
+                      <.link
+                        :if={@servers != []}
+                        navigate={~p"/apps/new"}
+                        class="paas-btn-primary inline-flex"
+                      >
+                        Register App
+                      </.link>
+                    </div>
+                  </td>
+                </tr>
+                <tr :for={{id, app} <- @streams.apps} id={id}>
+                  <td>
+                    <.link
+                      navigate={~p"/apps/#{app.id}/deployments"}
+                      class="font-medium text-hd-orange hover:text-hd-orange-dark"
+                    >
+                      {app.name}
+                    </.link>
+                  </td>
+                  <td>
+                    <.link
+                      href={"https://#{app.host}"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="font-mono text-sm text-hd-orange hover:text-hd-orange-dark hover:underline"
+                    >
+                      {app.host}
+                    </.link>
+                  </td>
+                  <td>
+                    <.language_badge app={app} />
+                  </td>
+                  <td>
+                    <.ram_cell app={app} memory={@app_memory[app.id]} />
+                  </td>
+                  <td>{app.server.name}</td>
+                  <td class="text-right">
+                    <.link
+                      navigate={~p"/apps/#{app.id}/deployments"}
+                      class="paas-btn-secondary text-[10px]"
+                    >
+                      <.icon name="hero-rocket-launch" class="size-3" /> Deploy
+                    </.link>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

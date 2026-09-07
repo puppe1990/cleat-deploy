@@ -7,6 +7,9 @@ defmodule PhoenixPaas.AWS.Lightsail.Stub do
   alias PhoenixPaas.AWS.Lightsail.{Catalog, InstanceSpec}
 
   @impl true
+  def list_instances(_region), do: {:ok, []}
+
+  @impl true
   def get_instance(_region, instance_name) do
     bundle_id = bundle_for_instance(instance_name)
     bundle = Catalog.find_bundle(bundle_id)

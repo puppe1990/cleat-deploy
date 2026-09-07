@@ -26,6 +26,8 @@ config :phoenix_paas,
 
 config :phoenix_paas, :lightsail_client, PhoenixPaas.AWS.Lightsail.Stub
 config :phoenix_paas, :hetzner_client, PhoenixPaas.Hetzner.Stub
+config :phoenix_paas, :runtime_logs, PhoenixPaas.Apps.RuntimeLogsSsh
+config :phoenix_paas, :runtime_memory, PhoenixPaas.Apps.RuntimeLogsSsh
 
 config :phoenix_paas, :auto_deploy_health_on_boot, true
 

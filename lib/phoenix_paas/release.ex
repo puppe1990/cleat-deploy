@@ -36,7 +36,7 @@ defmodule PhoenixPaas.Release do
 
   Use when a Lightsail key was missing or corrupt in the panel database:
 
-      bin/phoenix_paas eval 'PhoenixPaas.Release.fix_server_ssh("campanha-lightsail", "/home/ubuntu/lightsail-key.pem")'
+      bin/phoenix_paas eval 'PhoenixPaas.Release.fix_server_ssh("gestaobem-cx33", "/home/ubuntu/lightsail-key.pem")'
   """
   def fix_server_ssh(server_name, key_path)
       when is_binary(server_name) and is_binary(key_path) do

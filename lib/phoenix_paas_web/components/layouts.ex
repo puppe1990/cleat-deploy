@@ -17,7 +17,10 @@ defmodule PhoenixPaasWeb.Layouts do
   def app(assigns) do
     if assigns.active_tab == :auth do
       ~H"""
-      <div class="flex min-h-screen flex-col items-center justify-center bg-hd-bg px-4 py-12 text-hd-text antialiased">
+      <div class="relative flex min-h-screen flex-col items-center justify-center bg-hd-bg px-4 py-12 text-hd-text antialiased">
+        <div class="absolute top-4 right-4">
+          <PaasShell.theme_toggle id="theme-toggle-auth" />
+        </div>
         <div class="mb-8 flex items-center gap-2.5">
           <div class="flex size-9 items-center justify-center rounded-lg border border-hd-border bg-hd-card">
             <.icon name="hero-fire" class="size-5 text-hd-orange" />

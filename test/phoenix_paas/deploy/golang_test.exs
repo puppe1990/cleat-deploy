@@ -66,6 +66,7 @@ defmodule PhoenixPaas.Deploy.GolangTest do
       Golang.remote_build_script(server, app, config, "abc1234", "/tmp/src.tar.gz", manifest)
 
     assert script =~ "Installing Go"
+    assert script =~ "1.26.4"
     assert script =~ "go build -o bin/server"
     assert script =~ "go build -o bin/worker"
     assert script =~ "/opt/atelie/releases/build"

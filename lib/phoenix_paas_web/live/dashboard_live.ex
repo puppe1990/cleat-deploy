@@ -1,22 +1,17 @@
 defmodule PhoenixPaasWeb.DashboardLive do
   use PhoenixPaasWeb, :live_view
 
-  alias PhoenixPaas.{Apps, Servers}
+  alias PhoenixPaas.Servers.Insights
 
   @impl true
   def mount(_params, _session, socket) do
     scope = socket.assigns.current_scope
-    servers = Servers.list_servers(scope)
-    apps = Apps.list_apps(scope)
 
     {:ok,
      assign(socket,
        page_title: "Dashboard",
        active_tab: :dashboard,
-       servers: servers,
-       apps: apps,
-       server_count: length(servers),
-       app_count: length(apps)
+       insights: Insights.snapshot(scope, metrics: connected?(socket))
      )}
   end
 
@@ -31,37 +26,28 @@ defmodule PhoenixPaasWeb.DashboardLive do
       app_count={@app_count}
     >
       <div id="dashboard" class="space-y-4">
-        <div class="relative overflow-hidden rounded-md border border-hd-border bg-hd-card p-5">
-          <.icon
-            name="hero-fire"
-            class="pointer-events-none absolute -right-4 -top-4 size-48 rotate-12 fill-current text-hd-orange/5"
-          />
-          <div class="relative z-10 max-w-2xl space-y-2">
-            <span class="inline-block rounded border border-hd-border bg-hd-aside px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-hd-orange">
-              HETZNER + LIGHTSAIL AUTOMATIC DISPATCH
-            </span>
-            <h2 class="font-display text-2xl font-semibold tracking-tight text-hd-text">
-              Phoenix PaaS
-            </h2>
-            <p class="font-sans text-xs leading-relaxed text-hd-muted">
-              Deploy Phoenix and Go (Cais) applications to Hetzner Cloud or AWS Lightsail with git webhooks,
-              OTP/Cais releases, and no Kubernetes overhead.
+        <div
+          :if={@insights.server}
+          id="server-overview"
+          class="paas-card flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+        >
+          <div class="min-w-0">
+            <p class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+              Active server
             </p>
-            <div class="flex flex-wrap items-center gap-2 pt-1">
-              <span class="flex items-center gap-1 rounded border border-hd-border bg-hd-bg px-2 py-0.5 text-[11px] text-hd-muted">
-                <.icon name="hero-check-circle" class="size-3.5 text-hd-green" />
-                No Kubernetes Overheads
-              </span>
-              <span class="flex items-center gap-1 rounded border border-hd-border bg-hd-bg px-2 py-0.5 text-[11px] text-hd-muted">
-                <.icon name="hero-check-circle" class="size-3.5 text-hd-green" />
-                Direct Monit releases
-              </span>
-              <span class="flex items-center gap-1 rounded border border-hd-border bg-hd-bg px-2 py-0.5 text-[11px] text-hd-muted">
-                <.icon name="hero-check-circle" class="size-3.5 text-hd-green" />
-                GitHub Payload SSL Encryption
-              </span>
-            </div>
+            <h2 class="font-display text-lg font-semibold tracking-tight text-hd-text">
+              {@insights.server.name}
+            </h2>
+            <p class="font-mono text-[11px] text-hd-muted">
+              {server_spec(@insights.server)}
+            </p>
           </div>
+          <span class={[
+            "rounded border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide",
+            status_class(@insights.server.instance_status)
+          ]}>
+            {@insights.server.instance_status || "unknown"}
+          </span>
         </div>
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -84,82 +70,78 @@ defmodule PhoenixPaasWeb.DashboardLive do
           </.link>
         </div>
 
-        <div class="overflow-hidden rounded-md border border-hd-border bg-hd-card">
-          <div class="flex items-center justify-between border-b border-hd-border bg-hd-aside px-4 py-2.5">
-            <div class="space-y-0.5">
-              <h3 class="font-display text-xs font-semibold text-hd-text">
-                Registered Phoenix Applications
-              </h3>
-              <p class="text-[11px] text-hd-muted">
-                Live directory list mapping GitHub repositories to AWS systemd processes
-              </p>
-            </div>
-            <.link
-              navigate={~p"/apps/new"}
-              class="flex items-center gap-1 font-mono text-xs font-bold text-hd-orange hover:text-hd-orange-dark"
-            >
-              <.icon name="hero-plus" class="size-3.5" /> Register App
-            </.link>
-          </div>
-
-          <div :if={@apps == []} class="space-y-3 p-6 text-center">
-            <div class="mx-auto flex size-10 items-center justify-center rounded-md border border-hd-border bg-hd-aside text-hd-muted">
-              <.icon name="hero-globe-alt" class="size-5" />
-            </div>
-            <div class="space-y-0.5">
-              <h4 class="text-xs font-medium text-hd-text">No applications configured</h4>
-              <p class="mx-auto max-w-sm text-[11px] text-hd-muted">
-                Configure your first application repository, assign target domain hosts, and copy payload webhooks secret tokens.
-              </p>
-            </div>
-            <.link navigate={~p"/apps/new"} class="paas-btn-primary mx-auto">
-              <.icon name="hero-plus" class="size-3.5" /> Register App
-            </.link>
-          </div>
-
-          <div :if={@apps != []} class="overflow-x-auto">
-            <table class="paas-table w-full text-left">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Host</th>
-                  <th>Server</th>
-                  <th class="text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr :for={app <- @apps}>
-                  <td>
-                    <.link
-                      navigate={~p"/apps/#{app.id}"}
-                      class="font-medium text-hd-orange hover:text-hd-orange-dark"
-                    >
-                      {app.name}
-                    </.link>
-                  </td>
-                  <td>
-                    <.link
-                      href={"https://#{app.host}"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="font-mono text-sm text-hd-orange hover:text-hd-orange-dark hover:underline"
-                    >
-                      {app.host}
-                    </.link>
-                  </td>
-                  <td>{app.server.name}</td>
-                  <td class="text-right">
-                    <.link navigate={~p"/apps/#{app.id}"} class="paas-btn-secondary text-[10px]">
-                      <.icon name="hero-rocket-launch" class="size-3" /> Deploy
-                    </.link>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div id="server-charts" class="grid gap-4 lg:grid-cols-2">
+          <.area_chart
+            id="chart-cpu"
+            title="CPU · 24h"
+            hint="Hetzner utilization"
+            current={format_cpu(@insights.cpu_now)}
+            series={@insights.metrics.cpu}
+          />
+          <.dual_line_chart
+            id="chart-network"
+            title="Network · 24h"
+            hint="Bandwidth in / out"
+            current={format_net(@insights.net_in_now, @insights.net_out_now)}
+            inbound={@insights.metrics.network_in}
+            outbound={@insights.metrics.network_out}
+          />
+          <.runtime_bars
+            id="chart-runtimes"
+            elixir={@insights.runtimes.elixir}
+            go={@insights.runtimes.go}
+          />
+          <.deploy_bars id="chart-deploys" days={@insights.deploys} />
         </div>
       </div>
     </Layouts.app>
     """
   end
+
+  defp server_spec(server) do
+    parts =
+      [
+        server.bundle_name,
+        cpu_label(server.cpu_count),
+        ram_label(server.ram_mb),
+        disk_label(server.disk_gb),
+        server.region
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    if parts == [], do: server.host_ip || "—", else: Enum.join(parts, " · ")
+  end
+
+  defp cpu_label(n) when is_integer(n) and n > 0, do: "#{n} vCPU"
+  defp cpu_label(_), do: nil
+
+  defp ram_label(mb) when is_integer(mb) and mb >= 1024, do: "#{div(mb, 1024)} GB RAM"
+  defp ram_label(mb) when is_integer(mb) and mb > 0, do: "#{mb} MB RAM"
+  defp ram_label(_), do: nil
+
+  defp disk_label(gb) when is_integer(gb) and gb > 0, do: "#{gb} GB disk"
+  defp disk_label(_), do: nil
+
+  defp status_class("running"), do: "border-hd-green/40 bg-hd-green/10 text-hd-green"
+  defp status_class("missing"), do: "border-rose-500/40 bg-rose-500/10 text-rose-400"
+  defp status_class(_), do: "border-hd-border bg-hd-aside text-hd-muted"
+
+  defp format_cpu(nil), do: "—"
+
+  defp format_cpu(value) when is_number(value) do
+    :erlang.float_to_binary(value / 1, decimals: 1) <> "%"
+  end
+
+  defp format_net(nil, nil), do: "—"
+
+  defp format_net(inbound, outbound) do
+    "#{format_bps(inbound)} in · #{format_bps(outbound)} out"
+  end
+
+  defp format_bps(nil), do: "—"
+  defp format_bps(v) when v >= 1_000_000, do: rate(v / 1_000_000, "MB/s")
+  defp format_bps(v) when v >= 1_000, do: rate(v / 1_000, "KB/s")
+  defp format_bps(v), do: rate(v, "B/s")
+
+  defp rate(v, unit), do: :erlang.float_to_binary(v / 1, decimals: 1) <> " " <> unit
 end

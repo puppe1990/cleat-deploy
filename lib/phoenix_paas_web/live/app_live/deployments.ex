@@ -2,6 +2,7 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
   use PhoenixPaasWeb, :live_view
 
   alias PhoenixPaas.{Apps, Deployments}
+  alias PhoenixPaas.Apps.RuntimeMemory
   alias PhoenixPaas.Deploy.RuntimePackages
   alias PhoenixPaasWeb.AppLive.Layout
 
@@ -11,8 +12,6 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
   def mount(%{"app_id" => app_id}, _session, socket) do
     scope = socket.assigns.current_scope
     app = Apps.get_app!(scope, app_id)
-    deployments = Deployments.for_app(scope, app)
-    deploying? = active_deployment?(deployments)
 
     socket =
       socket
@@ -20,17 +19,20 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
       |> assign(:active_tab, :apps)
       |> assign(:app_detail_tab, :deployments)
       |> assign(:app, app)
-      |> assign(:apps, Apps.list_apps(scope))
+      |> assign(:apps, Apps.list_app_choices(scope))
       |> assign(:selected_deployment_id, nil)
-      |> assign(
-        :viewed_deployment,
-        viewed_deployment(deployments, nil, deploying?)
-      )
-      |> assign(:deploying?, deploying?)
-      |> assign(:deployments_empty?, deployments == [])
+      |> assign(:app_memory, nil)
       |> assign(:detail_tabs, Layout.detail_tabs(app.slug == "catalogo", runtime_packages(app)))
-      |> stream(:deployments, deployments, reset: true)
+      |> refresh_deployments(nil, nil)
       |> schedule_poll()
+
+    socket =
+      if connected?(socket) do
+        send(self(), :load_app_memory)
+        socket
+      else
+        socket
+      end
 
     {:ok, socket}
   end
@@ -42,12 +44,10 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
            triggered_by: "manual"
          }) do
       {:ok, _job} ->
-        deployments =
-          Deployments.for_app(socket.assigns.current_scope, socket.assigns.app)
-
         {:noreply,
          socket
-         |> refresh_deployments(deployments, nil, true)
+         |> refresh_deployments(nil, true)
+         |> schedule_poll()
          |> put_flash(:info, "Deploy queued")}
 
       {:error, _reason} ->
@@ -65,25 +65,28 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
     else
       deployment_id = String.to_integer(id)
 
-      deployments =
-        Deployments.for_app(socket.assigns.current_scope, socket.assigns.app)
-
       {:noreply,
        socket
        |> assign(:selected_deployment_id, deployment_id)
-       |> assign(:viewed_deployment, viewed_deployment(deployments, deployment_id, false))}
+       |> assign(
+         :viewed_deployment,
+         Deployments.get_with_log!(socket.assigns.app, deployment_id)
+       )}
     end
   end
 
   @impl true
+  def handle_info(:load_app_memory, socket) do
+    {:noreply, assign(socket, :app_memory, RuntimeMemory.for_app(socket.assigns.app))}
+  end
+
   def handle_info(:poll_deployments, socket) do
-    deployments = Deployments.for_app(socket.assigns.current_scope, socket.assigns.app)
-    deploying? = active_deployment?(deployments)
+    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
     selected_id = if deploying?, do: nil, else: socket.assigns.selected_deployment_id
 
     {:noreply,
      socket
-     |> refresh_deployments(deployments, selected_id, deploying?)
+     |> refresh_deployments(selected_id, deploying?)
      |> schedule_poll()}
   end
 
@@ -100,7 +103,7 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
       <div class="space-y-4">
         <Layout.shell_header app={@app} apps={@apps} />
         <Layout.shell_hero app={@app} deploying?={@deploying?} />
-        <Layout.shell_info_tiles app={@app} />
+        <Layout.shell_info_tiles app={@app} memory={@app_memory} />
 
         <div id="app-detail-tabs" class="paas-card overflow-hidden">
           <Layout.tab_bar app={@app} active_tab={@app_detail_tab} detail_tabs={@detail_tabs} />
@@ -222,20 +225,33 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
     """
   end
 
-  defp refresh_deployments(socket, deployments, selected_id, deploying?) do
+  defp refresh_deployments(socket, selected_id, deploying?) do
+    scope = socket.assigns.current_scope
+    app = socket.assigns.app
+    deployments = Deployments.for_app(scope, app)
+
+    deploying? =
+      case deploying? do
+        nil -> Enum.any?(deployments, &(&1.status in [:queued, :running]))
+        other -> other
+      end
+
     socket
     |> assign(:deployments_empty?, deployments == [])
     |> assign(:selected_deployment_id, selected_id)
-    |> assign(:viewed_deployment, viewed_deployment(deployments, selected_id, deploying?))
+    |> assign(:viewed_deployment, load_viewed(app, deployments, selected_id, deploying?))
     |> assign(:deploying?, deploying?)
     |> stream(:deployments, deployments, reset: true)
   end
 
-  defp active_deployment?(deployments) do
-    Enum.any?(deployments, &(&1.status in [:queued, :running]))
+  defp load_viewed(app, deployments, selected_id, deploying?) do
+    case viewed_summary(deployments, selected_id, deploying?) do
+      nil -> nil
+      summary -> Deployments.get_with_log!(app, summary.id)
+    end
   end
 
-  defp viewed_deployment(deployments, selected_id, deploying?) do
+  defp viewed_summary(deployments, selected_id, deploying?) do
     cond do
       deploying? ->
         Enum.find(deployments, &(&1.status in [:queued, :running])) || List.first(deployments)
@@ -249,7 +265,7 @@ defmodule PhoenixPaasWeb.AppLive.Deployments do
   end
 
   defp schedule_poll(socket) do
-    if connected?(socket) do
+    if connected?(socket) and socket.assigns.deploying? do
       Process.send_after(self(), :poll_deployments, @poll_ms)
     end
 

@@ -15,7 +15,7 @@ defmodule PhoenixPaas.Repo.SeedsTest do
     assert Enum.any?(apps, &(&1.slug == "open-drive"))
     assert Enum.any?(apps, &(&1.slug == "mass-transcriptor"))
     assert Enum.any?(apps, &(&1.slug == "phoenix-tts"))
-    assert Enum.any?(apps, &(&1.slug == "controle-agente-viagens"))
+    refute Enum.any?(apps, &(&1.slug == "controle-agente-viagens"))
 
     rapid_tools = Enum.find(apps, &(&1.slug == "rapid-tools"))
     assert rapid_tools.host == "tools.gestaobem.com"
@@ -47,13 +47,36 @@ defmodule PhoenixPaas.Repo.SeedsTest do
     slugs = Apps.list_apps(scope) |> Enum.map(& &1.slug) |> Enum.sort()
 
     assert slugs == [
-             "controle-agente-viagens",
              "mass-transcriptor",
              "open-drive",
              "phoenix-tts",
              "rapid-tools",
              "trip-planner"
            ]
+  end
+
+  test "seeds CLARITY AI onto Hetzner when the shared box is present" do
+    assert {:ok, %{scope: scope, hetzner_server: server}} =
+             Seeds.run(hetzner_server_ip: "167.233.201.9")
+
+    app = Enum.find(Apps.list_apps(scope), &(&1.slug == "assistente"))
+    assert app.name == "CLARITY AI"
+    assert app.host == "clarity.gestaobem.com"
+    assert app.github_repo == "puppe1990/assistente-ia"
+    assert app.port == 4013
+    assert app.systemd_unit == "assistente"
+    assert app.release_path == "/opt/assistente"
+    assert app.server_id == server.id
+
+    projects = Enum.find(Apps.list_apps(scope), &(&1.slug == "github-projects"))
+    assert projects.name == "GitHub Projects"
+    assert projects.host == "github.gestaobem.com"
+    assert projects.github_repo == "puppe1990/github-projects-viewer-cais"
+    assert projects.port == 4021
+    assert projects.runtime == "golang"
+    assert projects.systemd_unit == "github-projects"
+    assert projects.release_path == "/opt/github-projects"
+    assert projects.server_id == server.id
   end
 
   test "matheus scope sees seeded apps but other user does not" do
@@ -68,7 +91,7 @@ defmodule PhoenixPaas.Repo.SeedsTest do
     assert Enum.any?(matheus_apps, &(&1.slug == "open-drive"))
     assert Enum.any?(matheus_apps, &(&1.slug == "mass-transcriptor"))
     assert Enum.any?(matheus_apps, &(&1.slug == "phoenix-tts"))
-    assert Enum.any?(matheus_apps, &(&1.slug == "controle-agente-viagens"))
+    refute Enum.any?(matheus_apps, &(&1.slug == "controle-agente-viagens"))
     refute Enum.any?(other_apps, &(&1.slug == "trip-planner"))
     refute Enum.any?(other_apps, &(&1.slug == "rapid-tools"))
     refute Enum.any?(other_apps, &(&1.slug == "open-drive"))

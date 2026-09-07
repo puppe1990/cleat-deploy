@@ -40,6 +40,25 @@ defmodule PhoenixPaas.Deployments do
 
   def get_deployment!(id), do: Repo.get!(Deployment, id) |> Repo.preload(:app)
 
+  def get_with_log!(id), do: Repo.get!(Deployment, id)
+
+  def get_with_log!(%App{} = app, id) do
+    Repo.one!(from d in Deployment, where: d.app_id == ^app.id and d.id == ^id)
+  end
+
+  @history_fields [
+    :id,
+    :git_sha,
+    :git_ref,
+    :status,
+    :triggered_by,
+    :started_at,
+    :finished_at,
+    :inserted_at,
+    :updated_at,
+    :app_id
+  ]
+
   def for_app(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app)
       when tenant_id == tenant.id do
     list_for_app(app)
@@ -49,11 +68,39 @@ defmodule PhoenixPaas.Deployments do
 
   def for_app(%App{} = app), do: list_for_app(app)
 
+  def deploying?(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app)
+      when tenant_id == tenant.id do
+    deploying?(app)
+  end
+
+  def deploying?(%Scope{}, %App{}), do: false
+
+  def deploying?(%App{} = app) do
+    Repo.exists?(
+      from d in Deployment,
+        where: d.app_id == ^app.id and d.status in [:queued, :running]
+    )
+  end
+
+  def daily_status_counts(%Scope{tenant: tenant}, days) when is_integer(days) and days > 0 do
+    since = DateTime.add(DateTime.utc_now(:second), -days * 86_400, :second)
+
+    from(d in Deployment,
+      join: a in App,
+      on: a.id == d.app_id,
+      where: a.tenant_id == ^tenant.id and d.inserted_at >= ^since,
+      group_by: [fragment("date(?)", d.inserted_at), d.status],
+      select: {fragment("date(?)", d.inserted_at), d.status, count(d.id)}
+    )
+    |> Repo.all()
+  end
+
   defp list_for_app(%App{} = app) do
     Repo.all(
       from d in Deployment,
         where: d.app_id == ^app.id,
-        order_by: [desc: d.inserted_at, desc: d.id]
+        order_by: [desc: d.inserted_at, desc: d.id],
+        select: struct(d, ^@history_fields)
     )
   end
 

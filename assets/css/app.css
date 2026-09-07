@@ -31,11 +31,63 @@
   display: contents;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-hd-bg);
   color: var(--color-hd-text);
   -webkit-font-smoothing: antialiased;
+}
+
+.paas-shell {
+  display: grid;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.paas-shell-header,
+.paas-shell-footer {
+  grid-column: 1 / -1;
+}
+
+.paas-shell-sidebar {
+  display: none;
+}
+
+.paas-shell-main {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .paas-shell {
+    grid-template-columns: 15rem minmax(0, 1fr);
+  }
+
+  .paas-shell-sidebar {
+    display: flex;
+    grid-column: 1;
+    grid-row: 2;
+    width: 15rem;
+    min-width: 15rem;
+    max-width: 15rem;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .paas-shell-main {
+    grid-column: 2;
+  }
 }
 
 .font-display {
@@ -162,6 +214,34 @@ body {
   background: var(--color-hd-card);
   border: 1px solid var(--color-hd-border);
   border-radius: 0.375rem;
+}
+
+.paas-modal-backdrop {
+  animation: paas-fade-in 0.18s ease-out;
+}
+
+.paas-modal-panel {
+  animation: paas-modal-in 0.2s ease-out;
+}
+
+@keyframes paas-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes paas-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .paas-table th {
@@ -335,4 +415,27 @@ body {
 
 html {
   color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --color-hd-bg: #f4f6fa;
+  --color-hd-card: #ffffff;
+  --color-hd-aside: #eef1f6;
+  --color-hd-border: #d0d7de;
+  --color-hd-text: #1f2328;
+  --color-hd-muted: #656d76;
+  --color-hd-orange: #e67a12;
+  --color-hd-orange-dark: #c45f0a;
+  --color-hd-green: #1a7f37;
+  --color-hd-green-dark: #116329;
+}
+
+html[data-theme="light"] .paas-btn-primary,
+html[data-theme="light"] .btn-primary {
+  color: #ffffff;
+}
+
+html[data-theme="light"] .paas-grid-bg {
+  opacity: 0.4;
 }

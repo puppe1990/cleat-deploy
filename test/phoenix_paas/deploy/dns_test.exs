@@ -10,11 +10,11 @@ defmodule PhoenixPaas.Deploy.DnsTest do
   test "first_ipv4/1 returns the first A record from the resolver" do
     Application.put_env(:phoenix_paas, :dns_resolver, PhoenixPaas.Deploy.DnsMock)
 
-    Mox.expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "campanha.gestaobem.com" ->
+    Mox.expect(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "app.gestaobem.com" ->
       {:ok, ["52.73.89.19", "1.2.3.4"]}
     end)
 
-    assert {:ok, "52.73.89.19"} = Dns.first_ipv4("campanha.gestaobem.com")
+    assert {:ok, "52.73.89.19"} = Dns.first_ipv4("app.gestaobem.com")
   after
     Application.delete_env(:phoenix_paas, :dns_resolver)
   end

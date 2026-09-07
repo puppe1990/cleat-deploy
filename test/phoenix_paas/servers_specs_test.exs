@@ -54,7 +54,7 @@ defmodule PhoenixPaas.ServersSpecsTest do
       assert {:error, :missing_instance_name} = Servers.sync_specs(scope, server)
     end
 
-    test "returns error when Lightsail API fails", %{scope: scope} do
+    test "marks the server missing when Lightsail no longer has the VM", %{scope: scope} do
       server =
         TenancyFixtures.server_fixture(scope, %{
           aws_instance_name: "missing-vm",
@@ -65,7 +65,8 @@ defmodule PhoenixPaas.ServersSpecsTest do
         {:error, :not_found}
       end)
 
-      assert {:error, :not_found} = Servers.sync_specs(scope, server)
+      assert {:ok, updated} = Servers.sync_specs(scope, server)
+      assert updated.instance_status == "missing"
     end
   end
 
@@ -149,6 +150,24 @@ defmodule PhoenixPaas.ServersSpecsTest do
       end)
 
       assert {:error, :invalid_bundle} = Servers.resize_bundle(scope, server, "xlarge_3_0")
+    end
+  end
+
+  describe "delete_server/2" do
+    test "deletes a server with no apps", %{scope: scope} do
+      server = TenancyFixtures.server_fixture(scope, %{name: "gone-box"})
+
+      assert {:ok, _} = Servers.delete_server(scope, server)
+      assert Servers.list_servers(scope) == []
+    end
+
+    test "refuses to delete a server that still has apps", %{scope: scope} do
+      server = TenancyFixtures.server_fixture(scope)
+      TenancyFixtures.app_fixture(scope, server)
+
+      assert {:error, :has_apps} = Servers.delete_server(scope, server)
+      assert [%{id: id}] = Servers.list_servers(scope)
+      assert id == server.id
     end
   end
 end

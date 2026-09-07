@@ -54,23 +54,6 @@ defmodule PhoenixPaas.Apps.Provisioning do
       release_path: "/opt/catalog_platform",
       server_name: "catalogo-lightsail"
     },
-    "puppe1990/controle-agente-viagens" => %{
-      name: "VipTravel",
-      slug: "controle-agente-viagens",
-      host: "vip.gestaobem.com",
-      port: 4007,
-      systemd_unit: "controle_agente_viagens",
-      release_path: "/opt/controle_agente_viagens_phx"
-    },
-    "puppe1990/campanha-ops" => %{
-      name: "Campanha",
-      slug: "campanha",
-      host: "campanha.gestaobem.com",
-      port: 4000,
-      systemd_unit: "campanha",
-      release_path: "/opt/campanha",
-      server_name: "campanha-lightsail"
-    },
     "puppe1990/vexo" => %{
       name: "Vexo",
       slug: "vexo",
@@ -117,6 +100,16 @@ defmodule PhoenixPaas.Apps.Provisioning do
       runtime: "golang",
       systemd_unit: "trama-bras",
       release_path: "/opt/trama-bras",
+      server_name: "gestaobem-cx33"
+    },
+    "puppe1990/github-projects-viewer-cais" => %{
+      name: "GitHub Projects",
+      slug: "github-projects",
+      host: "github.gestaobem.com",
+      port: 4021,
+      runtime: "golang",
+      systemd_unit: "github-projects",
+      release_path: "/opt/github-projects",
       server_name: "gestaobem-cx33"
     }
   }

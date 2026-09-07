@@ -37,17 +37,20 @@ defmodule PhoenixPaas.Workers.AutoDeployHealthWorkerTest do
     scope = TenancyFixtures.scope_fixture()
 
     server =
-      TenancyFixtures.server_fixture(scope, %{name: "campanha-lightsail", host_ip: "52.0.157.89"})
+      TenancyFixtures.server_fixture(scope, %{name: "stale-lightsail", host_ip: "52.0.157.89"})
 
     TenancyFixtures.app_fixture(scope, server, %{
-      slug: "campanha",
-      host: "campanha.gestaobem.com",
-      github_repo: "puppe1990/campanha-ops-#{System.unique_integer()}"
+      slug: "ops-app",
+      host: "app.gestaobem.com",
+      github_repo: "puppe1990/ops-app-#{System.unique_integer()}"
     })
 
-    stub(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "campanha.gestaobem.com" ->
+    stub(PhoenixPaas.Deploy.DnsMock, :lookup_a, fn "app.gestaobem.com" ->
       {:ok, ["52.73.89.19"]}
     end)
+
+    stub(PhoenixPaas.AWS.LightsailMock, :list_instances, fn _region -> {:ok, []} end)
+    stub(PhoenixPaas.HetznerMock, :list_instances, fn _location -> {:ok, []} end)
 
     assert :ok = perform_job(AutoDeployHealthWorker, %{})
 
