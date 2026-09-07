@@ -7,13 +7,22 @@ defmodule PhoenixPaas.Workers.AutoDeployHealthWorker do
 
   alias PhoenixPaas.Apps
   alias PhoenixPaas.Deploy.Target
+  alias PhoenixPaas.Servers
 
   @impl Oban.Worker
   def perform(_job) do
     webhooks = Apps.sync_all_github_webhooks()
     ips = Target.reconcile_server_ips()
+    inventory = Servers.sync_all_inventories()
 
-    Logger.info("auto_deploy_health webhooks=#{inspect(webhooks)} server_ips=#{inspect(ips)}")
+    Logger.info(
+      "auto_deploy_health webhooks=#{inspect(webhooks)} server_ips=#{inspect(ips)} inventory=#{inventory_log(inventory)}"
+    )
+
     :ok
+  end
+
+  defp inventory_log(result) do
+    "running=#{length(result.updated)} missing=#{length(result.missing)} private=#{length(result.private)} new=#{length(result.discovered)}"
   end
 end

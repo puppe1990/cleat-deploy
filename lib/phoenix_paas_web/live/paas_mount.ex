@@ -6,12 +6,10 @@ defmodule PhoenixPaasWeb.PaasMount do
 
   def on_mount(:default, _params, _session, socket) do
     scope = socket.assigns.current_scope
-    servers = Servers.list_servers(scope)
-    apps = Apps.list_apps(scope)
 
     {:cont,
      socket
-     |> assign(:server_count, length(servers))
-     |> assign(:app_count, length(apps))}
+     |> assign(:server_count, Servers.count_servers(scope))
+     |> assign(:app_count, Apps.count_apps(scope))}
   end
 end

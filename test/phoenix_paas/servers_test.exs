@@ -1,8 +1,15 @@
 defmodule PhoenixPaas.ServersTest do
   use PhoenixPaas.DataCase
 
+  import Mox
+
+  alias PhoenixPaas.AWS.Lightsail.InstanceSpec
+  alias PhoenixPaas.HetznerMock
   alias PhoenixPaas.Servers
+  alias PhoenixPaas.Servers.SshKeys
   alias PhoenixPaas.TenancyFixtures
+
+  setup :verify_on_exit!
 
   setup do
     %{scope: TenancyFixtures.scope_fixture()}
@@ -88,6 +95,66 @@ defmodule PhoenixPaas.ServersTest do
 
       assert {:error, changeset} = Servers.create_server(scope, attrs)
       assert "is invalid" in errors_on(changeset).host_ip
+    end
+  end
+
+  describe "provision_server/2" do
+    test "creates a Hetzner VM and stores the assigned IP", %{scope: scope} do
+      {:ok, keys} = SshKeys.generate()
+
+      TenancyFixtures.server_fixture(scope, %{
+        name: "seed-key",
+        ssh_private_key: keys.private
+      })
+
+      expect(HetznerMock, :create_instance, fn attrs ->
+        assert attrs.name == "app-box"
+        assert attrs.location == "fsn1"
+        assert attrs.server_type == "cx33"
+        assert attrs.ssh_public_keys == [keys.public]
+
+        {:ok,
+         %InstanceSpec{
+           bundle_id: "cx33",
+           bundle_name: "CX33",
+           cpu_count: 4,
+           ram_mb: 8192,
+           disk_gb: 80,
+           status: "running",
+           blueprint_name: "Ubuntu 24.04",
+           monthly_price_usd: Decimal.new("7.59"),
+           name: "app-box",
+           public_ip: "167.233.201.44",
+           region: "fsn1"
+         }}
+      end)
+
+      assert {:ok, server} =
+               Servers.provision_server(scope, %{
+                 "name" => "App Box",
+                 "region" => "fsn1",
+                 "bundle_id" => "cx33",
+                 "deploy_mode" => "shared"
+               })
+
+      assert server.name == "app-box"
+      assert server.host_ip == "167.233.201.44"
+      assert server.provider == "hetzner"
+      assert server.bundle_id == "cx33"
+      assert server.instance_status == "running"
+      assert Servers.ssh_key_configured?(server)
+    end
+
+    test "rejects an invalid server name without calling Hetzner", %{scope: scope} do
+      assert {:error, changeset} =
+               Servers.provision_server(scope, %{
+                 "name" => "1box",
+                 "region" => "fsn1",
+                 "bundle_id" => "cx33",
+                 "deploy_mode" => "shared"
+               })
+
+      assert changeset.action == :insert
     end
   end
 

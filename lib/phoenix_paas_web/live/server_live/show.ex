@@ -26,6 +26,13 @@ defmodule PhoenixPaasWeb.ServerLive.Show do
     scope = socket.assigns.current_scope
 
     case Servers.sync_specs(scope, socket.assigns.server) do
+      {:ok, %PhoenixPaas.Servers.Server{instance_status: "missing"} = server} ->
+        {:noreply,
+         socket
+         |> assign(:server, server)
+         |> assign(:resize_options, [])
+         |> put_flash(:error, "This instance is gone from the cloud provider")}
+
       {:ok, server} ->
         {:noreply,
          socket
