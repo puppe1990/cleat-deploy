@@ -64,8 +64,6 @@ defmodule PhoenixPaas.Apps.App do
   def release_name("trip-planner"), do: "trip_planner_ia"
   def release_name("catalogo"), do: "catalog_platform"
   def release_name("controle-agente-viagens"), do: "controle_agente_viagens_phx"
-  def release_name("campanha"), do: "campanha"
-  def release_name("campanha-ops"), do: "campanha"
   # Mix app atom is :festa_platform (not the PaaS slug "decor")
   def release_name("decor"), do: "festa_platform"
   def release_name("gestao-bem-decor"), do: "festa_platform"
@@ -90,6 +88,10 @@ defmodule PhoenixPaas.Apps.App do
   def default_release_path("decor", _), do: "/opt/festa_platform"
   def default_release_path("pay-core", _), do: "/opt/pay_core"
   def default_release_path(slug, _) when is_binary(slug), do: "/opt/#{release_name(slug)}"
+
+  def main_language(%__MODULE__{runtime: runtime}), do: main_language(runtime)
+  def main_language("golang"), do: "Go"
+  def main_language(_runtime), do: "Elixir"
 
   def deploy_config(%__MODULE__{} = app) do
     release_path = app.release_path || default_release_path(app.slug)

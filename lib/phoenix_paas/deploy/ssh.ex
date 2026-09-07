@@ -13,6 +13,20 @@ defmodule PhoenixPaas.Deploy.Ssh do
 
   @tar_excludes ~w(_build deps node_modules .git tmp priv/static/assets)
 
+  def run(server, app, argv) when is_list(argv) do
+    with :ok <- ensure_commands(["ssh"]),
+         {:ok, key_path} <- write_temp_key(server) do
+      try do
+        host_ip = PhoenixPaas.Deploy.Target.ssh_host_ip(app, server)
+        target = "#{server.ssh_user}@#{host_ip}"
+        args = log_ssh_base(key_path, target) ++ argv
+        cmd("ssh", args)
+      after
+        File.rm(key_path)
+      end
+    end
+  end
+
   def run_deploy(deployment, app, server) do
     config = PhoenixPaas.Apps.App.deploy_config(app)
     branch = deployment.git_ref || app.branch
@@ -387,6 +401,20 @@ defmodule PhoenixPaas.Deploy.Ssh do
 
   defp tar_exclude_args do
     Enum.flat_map(@tar_excludes, fn entry -> ["--exclude", entry] end)
+  end
+
+  defp log_ssh_base(key_path, target) do
+    [
+      "-i",
+      key_path,
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=8",
+      target
+    ]
   end
 
   defp ssh_base(key_path, target) do

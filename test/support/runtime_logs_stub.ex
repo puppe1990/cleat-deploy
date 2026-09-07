@@ -1,0 +1,15 @@
+defmodule PhoenixPaas.Apps.RuntimeLogsStub do
+  @moduledoc false
+  @behaviour PhoenixPaas.Apps.RuntimeLogs
+
+  @impl true
+  def run(app, _argv) do
+    unit = app.systemd_unit || "phx-app"
+
+    {:ok,
+     """
+     2026-09-06T12:00:00Z #{unit} started
+     2026-09-06T12:00:01Z #{unit} {"kind":"request","phase":"completed","at":"2026-09-06T12:00:01Z","method":"HEAD","path":"/","status":200,"remote":"142.252.32.8","duration_ms":2.124}
+     """}
+  end
+end

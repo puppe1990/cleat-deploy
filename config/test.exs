@@ -49,6 +49,8 @@ config :phoenix_paas, Oban,
 config :phoenix_paas, :deploy_runner, PhoenixPaas.Deploy.RunnerMock
 config :phoenix_paas, :lightsail_client, PhoenixPaas.AWS.LightsailMock
 config :phoenix_paas, :hetzner_client, PhoenixPaas.HetznerMock
+config :phoenix_paas, :runtime_logs, PhoenixPaas.Apps.RuntimeLogsStub
+config :phoenix_paas, :runtime_memory, PhoenixPaas.Apps.RuntimeMemoryStub
 
 config :phoenix_paas, PhoenixPaas.Vault,
   ciphers: [

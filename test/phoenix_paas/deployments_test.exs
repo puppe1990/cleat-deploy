@@ -112,6 +112,36 @@ defmodule PhoenixPaas.DeploymentsTest do
       ids = Enum.map(Deployments.for_app(scope, app), & &1.id)
       assert ids == [newer.id, older.id]
     end
+
+    test "omits log bodies from the history list", %{scope: scope, app: app} do
+      {:ok, queued} = Deployments.create_deployment(app, %{git_sha: "sha-log"})
+      {:ok, running} = Deployments.mark_running(queued)
+      {:ok, done} = Deployments.mark_success(running, String.duplicate("build ok\n", 40))
+
+      [listed] = Deployments.for_app(scope, app)
+      assert listed.id == done.id
+      assert listed.git_sha == "sha-log"
+      assert listed.status == :success
+      assert listed.log in [nil, ""]
+
+      loaded = Deployments.get_with_log!(app, done.id)
+      assert loaded.log =~ "build ok"
+    end
+  end
+
+  describe "deploying?/2" do
+    test "is true only while a deploy is queued or running", %{scope: scope, app: app} do
+      refute Deployments.deploying?(scope, app)
+
+      {:ok, queued} = Deployments.create_deployment(app, %{git_sha: "sha-active"})
+      assert Deployments.deploying?(scope, app)
+
+      {:ok, running} = Deployments.mark_running(queued)
+      assert Deployments.deploying?(scope, app)
+
+      {:ok, _done} = Deployments.mark_success(running, "ok")
+      refute Deployments.deploying?(scope, app)
+    end
   end
 
   describe "duration/1" do

@@ -70,13 +70,23 @@ defmodule PhoenixPaasWeb.AppLive.Layout do
   end
 
   attr :app, :map, required: true
+  attr :memory, :any, default: nil
 
   def shell_info_tiles(assigns) do
+    peak = PhoenixPaas.Apps.RuntimeMemory.format_peak(assigns.memory)
+
+    assigns =
+      assign(assigns,
+        ram_label: PhoenixPaas.Apps.RuntimeMemory.format(assigns.memory),
+        ram_sub: peak || "systemd cgroup"
+      )
+
     ~H"""
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <.info_tile label="Domain Host" value={@app.host} mono sub="IPv4 ingress endpoint" />
       <.info_tile label="Deploy Branch" value={@app.branch} mono sub="Git HEAD target" />
       <.info_tile label="Target Server" value={@app.server.host_ip} mono sub={@app.server.name} />
+      <.info_tile id="app-memory-tile" label="Memory" value={@ram_label} mono sub={@ram_sub} />
       <.info_tile
         label="Auto Deploy"
         value={if @app.auto_deploy, do: "Webhook Enabled", else: "Manual Selector"}
@@ -103,6 +113,13 @@ defmodule PhoenixPaasWeb.AppLive.Layout do
         icon="hero-rocket-launch"
         active?={@active_tab == :deployments}
         href={~p"/apps/#{@app.id}/deployments"}
+      />
+      <.detail_tab_link
+        tab={:logs}
+        label="Logs"
+        icon="hero-command-line"
+        active?={@active_tab == :logs}
+        href={~p"/apps/#{@app.id}?tab=logs"}
       />
       <.detail_tab_link
         :if={:domains in @detail_tabs}
@@ -164,14 +181,15 @@ defmodule PhoenixPaasWeb.AppLive.Layout do
   end
 
   def detail_tabs(custom_domain_app?, runtime_packages) do
-    [:deployments]
+    [:deployments, :logs]
     |> then(fn tabs -> if custom_domain_app?, do: tabs ++ [:domains], else: tabs end)
     |> Kernel.++([:environment])
     |> then(fn tabs -> if runtime_packages != [], do: tabs ++ [:runtime], else: tabs end)
     |> Kernel.++([:webhook])
   end
 
-  def parse_detail_tab(tab) when tab in ["domains", "environment", "runtime", "webhook"] do
+  def parse_detail_tab(tab)
+      when tab in ["logs", "domains", "environment", "runtime", "webhook"] do
     String.to_existing_atom(tab)
   end
 

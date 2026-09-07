@@ -55,7 +55,40 @@ defmodule PhoenixPaasWeb.AppLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/apps")
     assert has_element?(view, "#apps-list")
+    assert has_element?(view, "#apps-table")
+    assert has_element?(view, "#apps-table th", "Main language")
+    assert has_element?(view, "#apps-table th", "RAM")
     assert render(view) =~ "Trip Planner"
+  end
+
+  test "lists each app's main language", %{conn: conn, scope: scope, server: server} do
+    phoenix_app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Trip Planner",
+        slug: "trip-planner",
+        github_repo: "puppe1990/trip-planner-ia-phx",
+        host: "trip.gestaobem.com",
+        runtime: "phoenix"
+      })
+
+    go_app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Atelie",
+        slug: "atelie",
+        github_repo: "puppe1990/atelie",
+        host: "atelie.gestaobem.com",
+        runtime: "golang"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/apps")
+
+    assert has_element?(view, "#apps-table")
+    assert has_element?(view, "#apps-table th", "Main language")
+    assert has_element?(view, "#app-#{phoenix_app.id}-language", "Elixir")
+    assert has_element?(view, "#app-#{go_app.id}-language", "Go")
+    _ = :sys.get_state(view.pid)
+    assert has_element?(view, "#app-#{phoenix_app.id}-ram", "163 MB")
+    assert has_element?(view, "#app-#{go_app.id}-ram", "173 MB")
   end
 
   test "redirects app show to deployments page", %{conn: conn, scope: scope, server: server} do
@@ -82,6 +115,8 @@ defmodule PhoenixPaasWeb.AppLiveTest do
     assert has_element?(view, "#deployments-history")
     assert html =~ "Deployments Version History"
     assert html =~ "abc123"
+    _ = :sys.get_state(view.pid)
+    assert has_element?(view, "#app-memory-tile", "163 MB")
   end
 
   test "switches app detail tabs", %{conn: conn, scope: scope, server: server} do
@@ -100,6 +135,27 @@ defmodule PhoenixPaasWeb.AppLiveTest do
     {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=webhook")
     assert has_element?(view, "#app-webhook")
     refute has_element?(view, "#app-env-vars")
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}?tab=logs")
+    assert has_element?(view, "#app-detail-tab-logs")
+    assert has_element?(view, "#app-runtime-logs")
+    assert has_element?(view, "#refresh-app-logs")
+    assert html =~ "2026-09-06T12:00:00Z"
+  end
+
+  test "keeps each journal line on a single numbered row", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=logs")
+
+    assert has_element?(view, "#log-line-1")
+    assert has_element?(view, "#log-line-2")
+    refute has_element?(view, "#log-line-3")
+    assert has_element?(view, "#log-line-2", "duration_ms")
   end
 
   test "shows environment variables with masked secrets", %{
