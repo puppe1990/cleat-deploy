@@ -1,10 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-hd-bg text-hd-text">
+<html lang="en" class="bg-hd-bg text-hd-text" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
     <meta name="theme-color" content="#0b0e14" />
+    <script>
+      try {
+        const theme = localStorage.getItem("phoenix-paas-theme")
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme
+          const meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute("content", theme === "light" ? "#f4f6fa" : "#0b0e14")
+        }
+      } catch (_error) {}
+    </script>
     <link rel="icon" type="image/png" sizes="32x32" href={~p"/images/icons/favicon-32x32.png"} />
     <link rel="icon" type="image/png" sizes="16x16" href={~p"/images/icons/favicon-16x16.png"} />
     <link rel="apple-touch-icon" sizes="180x180" href={~p"/images/icons/favicon-180x180.png"} />

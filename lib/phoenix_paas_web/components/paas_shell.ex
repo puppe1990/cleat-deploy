@@ -14,8 +14,8 @@ defmodule PhoenixPaasWeb.PaasShell do
 
   def shell(assigns) do
     ~H"""
-    <div class="flex min-h-screen flex-col bg-hd-bg text-hd-text antialiased">
-      <header class="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 border-b border-hd-border bg-hd-aside px-4 py-3">
+    <div id="app-shell" class="paas-shell bg-hd-bg text-hd-text antialiased">
+      <header class="paas-shell-header z-40 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-hd-border bg-hd-aside px-4 py-3">
         <.link
           href={~p"/"}
           class="group flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-90"
@@ -31,13 +31,14 @@ defmodule PhoenixPaasWeb.PaasShell do
                 MVP
               </span>
             </div>
-            <p class="text-xs text-hd-muted">
+            <p class="hidden text-xs text-hd-muted sm:block">
               Hetzner Cloud & GitHub webhooks for Phoenix and Go apps
             </p>
           </div>
         </.link>
 
         <nav class="flex flex-wrap items-center gap-2 text-xs font-medium">
+          <.theme_toggle id="theme-toggle" />
           <%= if @current_scope do %>
             <span class="hidden rounded-md border border-hd-border bg-hd-card px-2.5 py-1.5 text-hd-muted sm:inline">
               {@current_scope.user.email}
@@ -59,53 +60,100 @@ defmodule PhoenixPaasWeb.PaasShell do
         </nav>
       </header>
 
-      <main class="mx-auto w-full max-w-7xl flex-1 space-y-4 p-3 md:p-4">
-        <div class="mx-auto w-full max-w-[1440px] rounded-lg border border-hd-border bg-hd-bg shadow-[0_0_0_1px_rgba(48,54,61,0.5)] transition-all duration-300">
-          <div class="relative min-h-[700px] overflow-hidden rounded-lg p-4 lg:p-6">
-            <div class="paas-grid-bg pointer-events-none absolute inset-0 opacity-[0.03]" />
-
-            <div class="relative z-10 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-hd-border pb-4">
-              <div class="flex items-center gap-1 rounded-lg border border-hd-border bg-hd-aside p-1">
-                <.tab_link
-                  navigate={~p"/"}
-                  active?={@active_tab == :dashboard}
-                  icon="hero-squares-2x2"
-                  label="Dashboard"
-                />
-                <.tab_link
-                  navigate={~p"/servers"}
-                  active?={@active_tab == :servers}
-                  icon="hero-server-stack"
-                  label="Servers"
-                  count={@server_count}
-                />
-                <.tab_link
-                  navigate={~p"/apps"}
-                  active?={@active_tab == :apps}
-                  icon="hero-globe-alt"
-                  label="App Details"
-                  count={@app_count}
-                />
-              </div>
-
-              <div class="flex items-center gap-2">
-                <.link navigate={~p"/servers/new"} class="paas-btn-secondary">
-                  <.icon name="hero-plus" class="size-3.5 text-hd-orange" /> New VM Server
-                </.link>
-                <.link navigate={~p"/apps/new"} class="paas-btn-primary">
-                  <.icon name="hero-plus" class="size-3.5" /> Register App
-                </.link>
-              </div>
-            </div>
-
-            <div class="relative z-10">
-              {render_slot(@inner_block)}
-            </div>
-          </div>
+      <aside
+        id="app-sidebar"
+        class="paas-shell-sidebar flex-col border-r border-hd-border bg-hd-aside"
+      >
+        <div class="px-4 pt-5 pb-3">
+          <p class="font-mono text-[10px] font-semibold tracking-[0.18em] text-hd-muted uppercase">
+            Navigate
+          </p>
         </div>
-      </main>
+        <nav class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3" aria-label="Main">
+          <.nav_link
+            id="nav-dashboard"
+            navigate={~p"/"}
+            active?={@active_tab == :dashboard}
+            icon="hero-squares-2x2"
+            label="Dashboard"
+          />
+          <.nav_link
+            id="nav-servers"
+            navigate={~p"/servers"}
+            active?={@active_tab == :servers}
+            icon="hero-server-stack"
+            label="Servers"
+            count={@server_count}
+          />
+          <.nav_link
+            id="nav-apps"
+            navigate={~p"/apps"}
+            active?={@active_tab == :apps}
+            icon="hero-globe-alt"
+            label="App Details"
+            count={@app_count}
+          />
+        </nav>
+        <div
+          id="app-sidebar-actions"
+          class="mt-auto shrink-0 space-y-2 border-t border-hd-border px-3 py-4"
+        >
+          <.link navigate={~p"/servers/new"} class="paas-btn-secondary w-full justify-center">
+            <.icon name="hero-plus" class="size-3.5 text-hd-orange" /> New VM
+          </.link>
+          <.link navigate={~p"/apps/new"} class="paas-btn-primary w-full justify-center">
+            <.icon name="hero-plus" class="size-3.5" /> Register App
+          </.link>
+        </div>
+      </aside>
 
-      <footer class="mt-auto border-t border-hd-border bg-hd-aside px-4 py-3.5 text-xs text-hd-muted select-none">
+      <div class="paas-shell-main flex flex-col">
+        <div class="flex shrink-0 items-center justify-between gap-3 border-b border-hd-border bg-hd-bg px-3 py-3 lg:hidden">
+          <nav
+            id="app-nav-mobile"
+            class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg border border-hd-border bg-hd-aside p-1"
+          >
+            <.nav_link
+              id="nav-dashboard-mobile"
+              navigate={~p"/"}
+              active?={@active_tab == :dashboard}
+              icon="hero-squares-2x2"
+              label="Dashboard"
+              compact
+            />
+            <.nav_link
+              id="nav-servers-mobile"
+              navigate={~p"/servers"}
+              active?={@active_tab == :servers}
+              icon="hero-server-stack"
+              label="Servers"
+              count={@server_count}
+              compact
+            />
+            <.nav_link
+              id="nav-apps-mobile"
+              navigate={~p"/apps"}
+              active?={@active_tab == :apps}
+              icon="hero-globe-alt"
+              label="Apps"
+              count={@app_count}
+              compact
+            />
+          </nav>
+        </div>
+
+        <main class="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div class="paas-grid-bg pointer-events-none absolute inset-0 opacity-[0.03]" />
+          <div class="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 lg:p-6">
+            {render_slot(@inner_block)}
+          </div>
+        </main>
+      </div>
+
+      <footer
+        id="app-footer"
+        class="paas-shell-footer shrink-0 border-t border-hd-border bg-hd-aside px-4 py-3.5 text-xs text-hd-muted select-none"
+      >
         <div class="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 md:flex-row">
           <div class="flex items-center gap-1.5">
             <.icon name="hero-fire" class="size-3.5 text-hd-orange" />
@@ -117,7 +165,7 @@ defmodule PhoenixPaasWeb.PaasShell do
             </span>
           </div>
           <div class="flex items-center gap-3 font-mono text-[10px]">
-            <span>Client Region: US-EAST</span>
+            <span>Hetzner · fsn1</span>
             <span class="text-hd-green">Node Sync: ONLINE</span>
           </div>
         </div>
@@ -128,27 +176,60 @@ defmodule PhoenixPaasWeb.PaasShell do
     """
   end
 
+  attr :id, :string, default: "theme-toggle"
+
+  def theme_toggle(assigns) do
+    ~H"""
+    <button
+      id={@id}
+      type="button"
+      phx-hook="ThemeToggle"
+      phx-update="ignore"
+      class="paas-btn-secondary size-9 justify-center px-0"
+      aria-label="Switch to light mode"
+      aria-pressed="false"
+      title="Light mode"
+    >
+      <span data-theme-icon="sun">
+        <.icon name="hero-sun" class="size-4" />
+      </span>
+      <span data-theme-icon="moon" class="hidden">
+        <.icon name="hero-moon" class="size-4" />
+      </span>
+    </button>
+    """
+  end
+
+  attr :id, :string, required: true
   attr :navigate, :string, required: true
   attr :active?, :boolean, required: true
   attr :icon, :string, required: true
   attr :label, :string, required: true
   attr :count, :integer, default: nil
+  attr :compact, :boolean, default: false
 
-  defp tab_link(assigns) do
+  defp nav_link(assigns) do
     ~H"""
     <.link
+      id={@id}
       navigate={@navigate}
       class={[
-        "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-all",
-        @active? && "border border-hd-border bg-hd-card text-hd-orange",
-        !@active? && "text-hd-muted hover:text-hd-text"
+        "group flex items-center gap-2 rounded-lg text-xs font-semibold tracking-wide transition-all",
+        @compact && "px-2.5 py-1.5",
+        !@compact && "px-3 py-2.5",
+        @active? && "bg-hd-card text-hd-orange shadow-sm ring-1 ring-hd-border",
+        !@active? && "text-hd-muted hover:bg-hd-card/70 hover:text-hd-text"
       ]}
     >
-      <.icon name={@icon} class="size-3.5" />
-      <span>{@label}</span>
+      <.icon name={@icon} class="size-4 shrink-0" />
+      <span class="min-w-0 truncate">{@label}</span>
       <span
         :if={@count != nil}
-        class="rounded-md border border-hd-border bg-hd-card px-1.5 py-0.5 font-mono text-[10px] text-hd-orange"
+        class={[
+          "ml-auto rounded-md px-1.5 py-0.5 font-mono text-[10px]",
+          @active? && "bg-hd-orange/10 text-hd-orange",
+          !@active? && "bg-hd-card text-hd-muted ring-1 ring-hd-border"
+        ]}
       >
         {@count}
       </span>

@@ -21,6 +21,7 @@ defmodule PhoenixPaasWeb.UserSessionControllerTest do
       refute response =~ "Log in with email"
       assert response =~ ~s(id="signup-link")
       assert response =~ "Create account"
+      assert response =~ ~s(id="theme-toggle-auth")
     end
 
     test "clears stale welcome flash when session expired", %{conn: conn} do
