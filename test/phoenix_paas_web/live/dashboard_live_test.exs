@@ -2,7 +2,9 @@ defmodule PhoenixPaasWeb.DashboardLiveTest do
   use PhoenixPaasWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import Mox
 
+  alias PhoenixPaas.HetznerMock
   alias PhoenixPaas.TenancyFixtures
   alias PhoenixPaasWeb.UserAuth
 
@@ -33,6 +35,14 @@ defmodule PhoenixPaasWeb.DashboardLiveTest do
 
     {:ok, view, html} = live(conn, ~p"/")
     assert has_element?(view, "#dashboard")
+    assert has_element?(view, "#theme-toggle")
+    assert has_element?(view, "#app-shell")
+    assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "#app-sidebar-actions")
+    assert has_element?(view, "#app-footer")
+    assert has_element?(view, "#nav-dashboard")
+    assert has_element?(view, "#nav-servers")
+    assert has_element?(view, "#nav-apps")
     assert html =~ "Phoenix PaaS"
   end
 
@@ -56,9 +66,55 @@ defmodule PhoenixPaasWeb.DashboardLiveTest do
       host: "trip.gestaobem.com"
     })
 
-    {:ok, view, _html} = live(conn, ~p"/")
+    {:ok, view, html} = live(conn, ~p"/")
     assert has_element?(view, "#dashboard")
-    assert render(view) =~ "Trip Planner"
+    assert html =~ "Configured apps"
+    refute has_element?(view, "#dashboard-hero")
+    refute html =~ "No Kubernetes Overheads"
+    refute html =~ "HETZNER + LIGHTSAIL"
+    assert has_element?(view, "#server-charts")
+    assert has_element?(view, "#chart-cpu")
+    assert has_element?(view, "#chart-network")
+    assert has_element?(view, "#chart-runtimes")
+    assert has_element?(view, "#chart-deploys")
+    assert has_element?(view, "#chart-deploys-plot")
+    refute has_element?(view, "#dashboard-apps-table")
+    refute has_element?(view, "#apps-table")
+    refute html =~ "Registered Phoenix Applications"
+  end
+
+  test "plots hetzner cpu samples on the dashboard", %{conn: conn, scope: scope} do
+    TenancyFixtures.server_fixture(scope, %{
+      name: "gestaobem-cx33",
+      provider: "hetzner",
+      region: "fsn1",
+      aws_instance_name: "gestaobem-cx33",
+      bundle_name: "CX33",
+      cpu_count: 4,
+      ram_mb: 8192,
+      disk_gb: 80,
+      instance_status: "running"
+    })
+
+    stub(HetznerMock, :get_metrics, fn "fsn1", "gestaobem-cx33", _start, _end ->
+      {:ok,
+       %{
+         cpu: [%{t: 1, v: 8.0}, %{t: 2, v: 21.5}, %{t: 3, v: 14.0}],
+         network_in: [%{t: 1, v: 1_000.0}, %{t: 2, v: 2_000.0}, %{t: 3, v: 1_500.0}],
+         network_out: [%{t: 1, v: 500.0}, %{t: 2, v: 800.0}, %{t: 3, v: 600.0}]
+       }}
+    end)
+
+    {:ok, view, html} = live(conn, ~p"/")
+    assert has_element?(view, "#chart-cpu")
+    assert has_element?(view, "#chart-cpu-plot")
+    assert has_element?(view, "#chart-network-plot")
+    assert html =~ "gestaobem-cx33"
+    assert html =~ "CX33"
+    rendered = render(view)
+    assert rendered =~ "14.0%"
+    assert rendered =~ "21.5%"
+    assert rendered =~ "data-points"
   end
 
   test "does not show other tenant apps", %{conn: conn, scope: scope} do

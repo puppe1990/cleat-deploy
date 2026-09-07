@@ -13,9 +13,16 @@ defmodule PhoenixPaas.Hetzner do
   @callback get_instance(location(), instance_name()) ::
               {:ok, InstanceSpec.t()} | {:error, term()}
 
+  @callback list_instances(location()) :: {:ok, [InstanceSpec.t()]} | {:error, term()}
+
   @callback list_bundles(location()) :: {:ok, [Bundle.t()]} | {:error, term()}
 
   @callback change_bundle(location(), instance_name(), bundle_id()) :: :ok | {:error, term()}
+
+  @callback create_instance(map()) :: {:ok, InstanceSpec.t()} | {:error, term()}
+
+  @callback get_metrics(location(), instance_name(), DateTime.t(), DateTime.t()) ::
+              {:ok, map()} | {:error, term()}
 
   def client do
     Application.fetch_env!(:phoenix_paas, :hetzner_client)
@@ -25,11 +32,23 @@ defmodule PhoenixPaas.Hetzner do
     client().get_instance(location, instance_name)
   end
 
+  def list_instances(location) do
+    client().list_instances(location)
+  end
+
   def list_bundles(location) do
     client().list_bundles(location)
   end
 
   def change_bundle(location, instance_name, bundle_id) do
     client().change_bundle(location, instance_name, bundle_id)
+  end
+
+  def create_instance(attrs) when is_map(attrs) do
+    client().create_instance(attrs)
+  end
+
+  def get_metrics(location, instance_name, start_at, end_at) do
+    client().get_metrics(location, instance_name, start_at, end_at)
   end
 end
