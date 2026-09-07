@@ -1,0 +1,82 @@
+{
+	email admin@gestaobem.com
+	on_demand_tls {
+		ask http://127.0.0.1:4000/internal/domains/ask
+	}
+}
+
+paas.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4010
+}
+
+loja.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4000
+}
+
+vexo.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4012
+}
+
+decor.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4005
+}
+
+pay.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4008
+}
+
+drive.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4003
+}
+
+clarity.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4013
+}
+
+atelie.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4020
+}
+
+github.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4021
+}
+
+github.167.233.201.9.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:4021
+}
+
+trama.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4006
+}
+
+eletronicos.gestaobem.com {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	reverse_proxy 127.0.0.1:8080
+}
+
+paas.167.233.201.9.sslip.io {
+	encode gzip
+	reverse_proxy 127.0.0.1:4010
+}
+
+:443 {
+	tls {
+		on_demand
+	}
+	reverse_proxy 127.0.0.1:4000
+}

@@ -54,17 +54,17 @@ defmodule PhoenixPaas.Deploy.Golang do
       sudo swapon /swapfile || true
     fi
 
-    if ! command -v go >/dev/null 2>&1; then
-      log "Installing Go"
+    export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
+    GO_VER="1.26.4"
+    if ! command -v go >/dev/null 2>&1 || ! go version | grep -qE 'go1\\.(2[6-9]|[3-9][0-9])'; then
+      log "Installing Go ${GO_VER}"
       sudo apt-get update
       sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates tar build-essential
-      GO_VER="1.25.1"
       curl -fsSL "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -o /tmp/go.tgz
       sudo rm -rf /usr/local/go
       sudo tar -C /usr/local -xzf /tmp/go.tgz
+      export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
     fi
-
-    export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
     if [[ -f package.json ]] && ! command -v npm >/dev/null 2>&1; then
       log "Installing Node.js"
