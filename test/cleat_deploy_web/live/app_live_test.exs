@@ -211,6 +211,28 @@ defmodule CleatDeployWeb.AppLiveTest do
     assert has_element?(view, "#app-memory-tile", "163 MB")
     assert has_element?(view, "#app-cpu-tile", "2.8%")
     assert has_element?(view, "#app-disk-tile", "510 MB")
+    assert has_element?(view, "#app-runtime-badge", "PHX")
+  end
+
+  test "shows GO badge for golang apps instead of PHX", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Cifra",
+        slug: "cifra",
+        github_repo: "puppe1990/cifra-finops",
+        host: "finops.gestaobem.com",
+        runtime: "golang"
+      })
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    assert html =~ "Cifra"
+    assert has_element?(view, "#app-runtime-badge", "GO")
+    refute has_element?(view, "#app-runtime-badge", "PHX")
   end
 
   test "switches app detail tabs", %{conn: conn, scope: scope, server: server} do
