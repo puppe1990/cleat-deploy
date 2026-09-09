@@ -36,11 +36,22 @@ defmodule CleatDeployWeb.AppLive.Layout do
   attr :deploying?, :boolean, required: true
 
   def shell_hero(assigns) do
+    golang? = assigns.app.runtime == "golang"
+
+    assigns = assign(assigns, golang?: golang?, runtime_badge: if(golang?, do: "GO", else: "PHX"))
+
     ~H"""
     <div class="paas-card flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
       <div class="flex items-center gap-2">
-        <span class="inline-flex h-7 w-12 items-center justify-center rounded border border-hd-border bg-hd-aside font-mono text-[10px] font-bold text-hd-orange">
-          PHX
+        <span
+          id="app-runtime-badge"
+          class={[
+            "inline-flex h-7 w-12 items-center justify-center rounded border font-mono text-[10px] font-bold",
+            @golang? && "border-hd-green/40 bg-hd-green/10 text-hd-green",
+            not @golang? && "border-hd-border bg-hd-aside text-hd-orange"
+          ]}
+        >
+          {@runtime_badge}
         </span>
         <div>
           <h2 class="font-display text-base font-semibold text-hd-text">{@app.name}</h2>
