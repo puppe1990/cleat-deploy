@@ -257,6 +257,59 @@ defmodule CleatDeployWeb.AppLiveTest do
     assert has_element?(view, "#app-runtime-logs")
     assert has_element?(view, "#refresh-app-logs")
     assert html =~ "2026-09-06T12:00:00Z"
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=danger")
+    assert has_element?(view, "#app-detail-tab-danger")
+    assert has_element?(view, "#app-danger-zone")
+    assert has_element?(view, "#delete-app-form")
+    refute has_element?(view, "#app-webhook")
+  end
+
+  test "danger zone deletes the app after slug confirmation", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Cifra",
+        slug: "cifra",
+        github_repo: "puppe1990/cifra-finops",
+        host: "finops.gestaobem.com"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=danger")
+    assert has_element?(view, "#delete-app-button[disabled]")
+
+    view
+    |> form("#delete-app-form", delete: %{confirm: "wrong"})
+    |> render_change()
+
+    assert has_element?(view, "#delete-app-button[disabled]")
+
+    html =
+      view
+      |> form("#delete-app-form", delete: %{confirm: "wrong"})
+      |> render_submit()
+
+    assert html =~ "Type cifra to confirm"
+    assert Apps.get_app_by_repo("puppe1990/cifra-finops")
+
+    view
+    |> form("#delete-app-form", delete: %{confirm: "cifra"})
+    |> render_change()
+
+    assert has_element?(view, "#delete-app-button:not([disabled])")
+
+    {:ok, index_view, html} =
+      view
+      |> form("#delete-app-form", delete: %{confirm: "cifra"})
+      |> render_submit()
+      |> follow_redirect(conn, ~p"/apps")
+
+    assert html =~ "was deleted"
+    assert has_element?(index_view, "#apps-list")
+    refute Apps.get_app_by_repo("puppe1990/cifra-finops")
   end
 
   test "keeps each journal line on a single numbered row", %{

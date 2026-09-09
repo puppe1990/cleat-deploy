@@ -34,6 +34,8 @@ defmodule CleatDeployWeb.AppLive.Show do
       |> assign(:runtime_logs, nil)
       |> assign(:logs_error, nil)
       |> assign(:app_memory, nil)
+      |> assign(:delete_confirm, "")
+      |> assign(:delete_form, to_form(%{"confirm" => ""}, as: :delete))
       |> assign(:deploying?, deploying?)
       |> schedule_poll(deploying?)
 
@@ -99,6 +101,42 @@ defmodule CleatDeployWeb.AppLive.Show do
 
   def handle_event("refresh_logs", _params, socket) do
     {:noreply, load_logs(socket)}
+  end
+
+  def handle_event("validate_delete", %{"delete" => params}, socket) do
+    confirm = Map.get(params, "confirm", "")
+
+    {:noreply,
+     socket
+     |> assign(:delete_confirm, confirm)
+     |> assign(:delete_form, to_form(%{"confirm" => confirm}, as: :delete))}
+  end
+
+  def handle_event("delete_app", %{"delete" => params}, socket) do
+    app = socket.assigns.app
+    confirm = params |> Map.get("confirm", "") |> String.trim()
+
+    cond do
+      socket.assigns.deploying? ->
+        {:noreply, put_flash(socket, :error, "Wait for the running deploy to finish")}
+
+      confirm != app.slug ->
+        {:noreply, put_flash(socket, :error, "Type #{app.slug} to confirm deletion")}
+
+      true ->
+        _ = CleatDeploy.Deploy.Teardown.run(app)
+
+        case Apps.delete_app(socket.assigns.current_scope, app) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(:info, "#{app.name} was deleted")
+             |> push_navigate(to: ~p"/apps")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Could not delete #{app.name}")}
+        end
+    end
   end
 
   @impl true
@@ -352,6 +390,51 @@ defmodule CleatDeployWeb.AppLive.Show do
                     {String.duplicate("•", 32)}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div :if={@app_detail_tab == :danger} id="app-danger-zone" class="space-y-4">
+              <div class="space-y-0.5">
+                <h3 class="font-display text-xs font-semibold text-rose-400">Danger zone</h3>
+                <p class="text-[11px] leading-relaxed text-hd-muted">
+                  Permanently removes <span class="font-medium text-hd-text">{@app.name}</span>
+                  from Cleat — deploy history, env vars, and the GitHub webhook.
+                  The unit on {@app.server.name} is stopped and
+                  <span class="font-mono text-hd-text">{@app.release_path}</span>
+                  is deleted. This cannot be undone.
+                </p>
+              </div>
+
+              <div class="rounded-lg border border-rose-500/30 bg-rose-500/5 p-4">
+                <.form
+                  for={@delete_form}
+                  id="delete-app-form"
+                  phx-change="validate_delete"
+                  phx-submit="delete_app"
+                  class="space-y-3"
+                >
+                  <p class="text-[11px] text-hd-muted">
+                    Type <span class="font-mono text-hd-text">{@app.slug}</span> to confirm.
+                  </p>
+                  <input
+                    id="delete-app-confirm"
+                    type="text"
+                    name={@delete_form[:confirm].name}
+                    value={@delete_form[:confirm].value}
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="paas-input w-full font-mono"
+                    placeholder={@app.slug}
+                  />
+                  <button
+                    id="delete-app-button"
+                    type="submit"
+                    disabled={String.trim(@delete_confirm) != @app.slug or @deploying?}
+                    class="inline-flex items-center justify-center gap-1.5 rounded-md bg-rose-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <.icon name="hero-trash" class="size-3.5" /> Delete {@app.name}
+                  </button>
+                </.form>
               </div>
             </div>
           </div>

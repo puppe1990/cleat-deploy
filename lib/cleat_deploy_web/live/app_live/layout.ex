@@ -170,6 +170,14 @@ defmodule CleatDeployWeb.AppLive.Layout do
         active?={@active_tab == :webhook}
         href={~p"/apps/#{@app.id}?tab=webhook"}
       />
+      <.detail_tab_link
+        tab={:danger}
+        label="Danger zone"
+        icon="hero-exclamation-triangle"
+        tone={:danger}
+        active?={@active_tab == :danger}
+        href={~p"/apps/#{@app.id}?tab=danger"}
+      />
     </div>
     """
   end
@@ -179,6 +187,7 @@ defmodule CleatDeployWeb.AppLive.Layout do
   attr :icon, :string, required: true
   attr :active?, :boolean, required: true
   attr :href, :string, required: true
+  attr :tone, :atom, default: :default
 
   defp detail_tab_link(assigns) do
     ~H"""
@@ -189,8 +198,10 @@ defmodule CleatDeployWeb.AppLive.Layout do
       aria-selected={@active?}
       class={[
         "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition-all",
-        @active? && "border border-hd-border bg-hd-card text-hd-orange",
-        !@active? && "text-hd-muted hover:text-hd-text"
+        @active? && @tone == :danger && "border border-rose-500/40 bg-hd-card text-rose-400",
+        @active? && @tone != :danger && "border border-hd-border bg-hd-card text-hd-orange",
+        !@active? && @tone == :danger && "text-hd-muted hover:text-rose-400",
+        !@active? && @tone != :danger && "text-hd-muted hover:text-hd-text"
       ]}
     >
       <.icon name={@icon} class="size-3.5" />
@@ -204,11 +215,11 @@ defmodule CleatDeployWeb.AppLive.Layout do
     |> then(fn tabs -> if custom_domain_app?, do: tabs ++ [:domains], else: tabs end)
     |> Kernel.++([:environment])
     |> then(fn tabs -> if runtime_packages != [], do: tabs ++ [:runtime], else: tabs end)
-    |> Kernel.++([:webhook])
+    |> Kernel.++([:webhook, :danger])
   end
 
   def parse_detail_tab(tab)
-      when tab in ["logs", "domains", "environment", "runtime", "webhook"] do
+      when tab in ["logs", "domains", "environment", "runtime", "webhook", "danger"] do
     String.to_existing_atom(tab)
   end
 
