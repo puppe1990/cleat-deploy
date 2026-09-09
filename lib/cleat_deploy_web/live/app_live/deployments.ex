@@ -28,6 +28,7 @@ defmodule CleatDeployWeb.AppLive.Deployments do
 
     socket =
       if connected?(socket) do
+        :ok = Deployments.subscribe(app)
         send(self(), :load_app_memory)
         socket
       else
@@ -81,14 +82,15 @@ defmodule CleatDeployWeb.AppLive.Deployments do
   end
 
   def handle_info(:poll_deployments, socket) do
-    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
-    selected_id = if deploying?, do: nil, else: socket.assigns.selected_deployment_id
-
-    {:noreply,
-     socket
-     |> refresh_deployments(selected_id, deploying?)
-     |> schedule_poll()}
+    {:noreply, refresh_from_db(socket)}
   end
+
+  def handle_info({:deployment_changed, app_id}, socket)
+      when app_id == socket.assigns.app.id do
+    {:noreply, refresh_from_db(socket)}
+  end
+
+  def handle_info({:deployment_changed, _app_id}, socket), do: {:noreply, socket}
 
   @impl true
   def render(assigns) do
@@ -223,6 +225,15 @@ defmodule CleatDeployWeb.AppLive.Deployments do
       </div>
     </Layouts.app>
     """
+  end
+
+  defp refresh_from_db(socket) do
+    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
+    selected_id = if deploying?, do: nil, else: socket.assigns.selected_deployment_id
+
+    socket
+    |> refresh_deployments(selected_id, deploying?)
+    |> schedule_poll()
   end
 
   defp refresh_deployments(socket, selected_id, deploying?) do

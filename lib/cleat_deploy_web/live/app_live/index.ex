@@ -15,7 +15,11 @@ defmodule CleatDeployWeb.AppLive.Index do
       |> assign(:servers, Servers.list_servers(socket.assigns.current_scope))
       |> assign(:apps_list, apps)
       |> assign(:app_memory, %{})
-      |> stream(:apps, apps)
+      |> assign(:apps_query, "")
+      |> assign(:apps_runtime, :all)
+      |> assign(:apps_sort, :name)
+      |> assign(:apps_sort_dir, :asc)
+      |> restream_apps(apps, %{})
 
     socket =
       if connected?(socket) do
@@ -89,6 +93,46 @@ defmodule CleatDeployWeb.AppLive.Index do
     {:noreply, assign(socket, :show_advanced?, not socket.assigns.show_advanced?)}
   end
 
+  def handle_event("filter_apps", params, socket) do
+    query = params["query"] || params["apps_query"] || ""
+
+    {:noreply,
+     socket
+     |> assign(:apps_query, query)
+     |> restream_apps()}
+  end
+
+  def handle_event("filter_runtime", %{"runtime" => runtime}, socket) do
+    runtime =
+      case runtime do
+        "golang" -> :golang
+        "phoenix" -> :phoenix
+        _ -> :all
+      end
+
+    {:noreply,
+     socket
+     |> assign(:apps_runtime, runtime)
+     |> restream_apps()}
+  end
+
+  def handle_event("sort_apps", %{"by" => field}, socket) do
+    field = sort_field(field)
+
+    {sort, dir} =
+      if socket.assigns.apps_sort == field do
+        {field, toggle_dir(socket.assigns.apps_sort_dir)}
+      else
+        {field, :asc}
+      end
+
+    {:noreply,
+     socket
+     |> assign(:apps_sort, sort)
+     |> assign(:apps_sort_dir, dir)
+     |> restream_apps()}
+  end
+
   def handle_event("save", %{"app" => app_params}, socket) do
     app_params =
       app_params
@@ -99,9 +143,12 @@ defmodule CleatDeployWeb.AppLive.Index do
       {:ok, app, webhook_status} ->
         app = Apps.get_app!(socket.assigns.current_scope, app.id)
 
+        apps_list = [app | socket.assigns.apps_list]
+
         {:noreply,
          socket
-         |> stream_insert(:apps, app)
+         |> assign(:apps_list, apps_list)
+         |> restream_apps()
          |> assign(:app_count, socket.assigns.app_count + 1)
          |> put_flash(:info, app_registered_message(webhook_status))
          |> push_navigate(to: ~p"/apps/#{app.id}/deployments")}
@@ -118,7 +165,7 @@ defmodule CleatDeployWeb.AppLive.Index do
     {:noreply,
      socket
      |> assign(:app_memory, memory)
-     |> stream(:apps, socket.assigns.apps_list, reset: true)}
+     |> restream_apps()}
   end
 
   @impl true
@@ -321,22 +368,77 @@ defmodule CleatDeployWeb.AppLive.Index do
             </.link>
           </div>
 
+          <div class="flex flex-col gap-3 border-b border-hd-border bg-hd-aside/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <.form
+              for={to_form(%{"query" => @apps_query})}
+              id="apps-filter"
+              phx-change="filter_apps"
+              class="min-w-0 flex-1"
+            >
+              <label class="relative block max-w-md">
+                <span class="sr-only">Filter applications</span>
+                <.icon
+                  name="hero-magnifying-glass"
+                  class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-hd-muted"
+                />
+                <input
+                  type="search"
+                  name="query"
+                  id="apps-query"
+                  value={@apps_query}
+                  phx-debounce="150"
+                  placeholder="Filter by name, host, language, or server"
+                  class="paas-input w-full pl-9"
+                />
+              </label>
+            </.form>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <.runtime_filter_chip id="apps-filter-all" runtime={:all} current={@apps_runtime}>
+                All
+              </.runtime_filter_chip>
+              <.runtime_filter_chip
+                id="apps-filter-phoenix"
+                runtime={:phoenix}
+                current={@apps_runtime}
+              >
+                Elixir
+              </.runtime_filter_chip>
+              <.runtime_filter_chip
+                id="apps-filter-golang"
+                runtime={:golang}
+                current={@apps_runtime}
+              >
+                Go
+              </.runtime_filter_chip>
+            </div>
+          </div>
+
           <div class="overflow-x-auto">
             <table id="apps-table" class="paas-table w-full text-left">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Host</th>
-                  <th>Main language</th>
-                  <th>RAM</th>
-                  <th>CPU</th>
-                  <th>Disk</th>
-                  <th>Server</th>
+                  <.sort_header field={:name} label="Name" sort={@apps_sort} dir={@apps_sort_dir} />
+                  <.sort_header field={:host} label="Host" sort={@apps_sort} dir={@apps_sort_dir} />
+                  <.sort_header
+                    field={:language}
+                    label="Main language"
+                    sort={@apps_sort}
+                    dir={@apps_sort_dir}
+                  />
+                  <.sort_header field={:ram} label="RAM" sort={@apps_sort} dir={@apps_sort_dir} />
+                  <.sort_header field={:cpu} label="CPU" sort={@apps_sort} dir={@apps_sort_dir} />
+                  <.sort_header field={:disk} label="Disk" sort={@apps_sort} dir={@apps_sort_dir} />
+                  <.sort_header
+                    field={:server}
+                    label="Server"
+                    sort={@apps_sort}
+                    dir={@apps_sort_dir}
+                  />
                   <th class="text-right">Action</th>
                 </tr>
               </thead>
               <tbody id="apps-list" phx-update="stream">
-                <tr id="apps-empty" class="hidden only:table-row">
+                <tr :if={@apps_list == []} id="apps-empty">
                   <td colspan="8" class="py-8 text-center text-hd-muted">
                     <div class="space-y-3">
                       <p class="font-mono text-xs">No applications configured.</p>
@@ -348,6 +450,14 @@ defmodule CleatDeployWeb.AppLive.Index do
                         Register App
                       </.link>
                     </div>
+                  </td>
+                </tr>
+                <tr
+                  :if={@apps_list != [] and @apps_visible_count == 0}
+                  id="apps-filter-empty"
+                >
+                  <td colspan="8" class="py-8 text-center text-hd-muted">
+                    <p class="font-mono text-xs">No applications match this filter.</p>
                   </td>
                 </tr>
                 <tr :for={{id, app} <- @streams.apps} id={id}>
@@ -494,4 +604,136 @@ defmodule CleatDeployWeb.AppLive.Index do
 
   defp app_registered_message({:error, message}),
     do: "App registered — webhook not configured (#{message})"
+
+  defp restream_apps(socket) do
+    restream_apps(socket, socket.assigns.apps_list, socket.assigns.app_memory)
+  end
+
+  defp restream_apps(socket, apps, memory) do
+    visible = visible_apps(apps, socket, memory)
+
+    socket
+    |> assign(:apps_visible_count, length(visible))
+    |> stream(:apps, visible, reset: true)
+  end
+
+  defp visible_apps(apps, socket, memory) do
+    apps
+    |> Enum.filter(&matches_runtime?(&1, socket.assigns.apps_runtime))
+    |> Enum.filter(&matches_query?(&1, socket.assigns.apps_query))
+    |> sort_apps(socket.assigns.apps_sort, socket.assigns.apps_sort_dir, memory)
+  end
+
+  defp matches_runtime?(_app, :all), do: true
+  defp matches_runtime?(%App{runtime: "golang"}, :golang), do: true
+  defp matches_runtime?(%App{runtime: runtime}, :phoenix) when runtime != "golang", do: true
+  defp matches_runtime?(_app, _runtime), do: false
+
+  defp matches_query?(_app, query) when query in [nil, ""], do: true
+
+  defp matches_query?(app, query) do
+    needle = query |> to_string() |> String.downcase() |> String.trim()
+
+    [app.name, app.host, app.slug, App.main_language(app), app.server && app.server.name]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.any?(fn value -> String.contains?(String.downcase(value), needle) end)
+  end
+
+  defp sort_apps(apps, field, dir, memory) do
+    {present, missing} = Enum.split_with(apps, &(sort_value(&1, field, memory) != :missing))
+
+    sorted = Enum.sort_by(present, &sort_value(&1, field, memory))
+    sorted = if dir == :desc, do: Enum.reverse(sorted), else: sorted
+    sorted ++ missing
+  end
+
+  defp sort_value(app, :name, _memory), do: String.downcase(app.name || "")
+  defp sort_value(app, :host, _memory), do: String.downcase(app.host || "")
+  defp sort_value(app, :language, _memory), do: App.main_language(app)
+
+  defp sort_value(app, :server, _memory),
+    do: String.downcase((app.server && app.server.name) || "")
+
+  defp sort_value(app, :ram, memory), do: metric(memory, app.id, :bytes)
+  defp sort_value(app, :cpu, memory), do: metric(memory, app.id, :cpu_pct)
+  defp sort_value(app, :disk, memory), do: metric(memory, app.id, :disk_bytes)
+  defp sort_value(app, _field, _memory), do: String.downcase(app.name || "")
+
+  defp metric(memory, app_id, key) do
+    case memory[app_id] do
+      %{^key => value} when is_number(value) -> value
+      _ -> :missing
+    end
+  end
+
+  defp sort_field("host"), do: :host
+  defp sort_field("language"), do: :language
+  defp sort_field("ram"), do: :ram
+  defp sort_field("cpu"), do: :cpu
+  defp sort_field("disk"), do: :disk
+  defp sort_field("server"), do: :server
+  defp sort_field(_), do: :name
+
+  defp toggle_dir(:asc), do: :desc
+  defp toggle_dir(_dir), do: :asc
+
+  attr :id, :string, required: true
+  attr :runtime, :atom, required: true
+  attr :current, :atom, required: true
+  slot :inner_block, required: true
+
+  defp runtime_filter_chip(assigns) do
+    active? = assigns.runtime == assigns.current
+    assigns = assign(assigns, :active?, active?)
+
+    ~H"""
+    <button
+      id={@id}
+      type="button"
+      phx-click="filter_runtime"
+      phx-value-runtime={@runtime}
+      class={[
+        "rounded-md border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide transition-colors",
+        @active? && "border-hd-orange/50 bg-hd-orange/10 text-hd-orange",
+        not @active? &&
+          "border-hd-border bg-hd-card text-hd-muted hover:border-hd-orange/40 hover:text-hd-text"
+      ]}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  attr :field, :atom, required: true
+  attr :label, :string, required: true
+  attr :sort, :atom, required: true
+  attr :dir, :atom, required: true
+
+  defp sort_header(assigns) do
+    active? = assigns.sort == assigns.field
+    assigns = assign(assigns, :active?, active?)
+
+    ~H"""
+    <th>
+      <button
+        id={"sort-apps-#{@field}"}
+        type="button"
+        phx-click="sort_apps"
+        phx-value-by={@field}
+        class={[
+          "inline-flex items-center gap-1 uppercase transition-colors",
+          @active? && "text-hd-text",
+          not @active? && "text-hd-muted hover:text-hd-text"
+        ]}
+      >
+        {@label}
+        <.icon
+          :if={@active?}
+          name={if @dir == :asc, do: "hero-chevron-up", else: "hero-chevron-down"}
+          class="size-3"
+        />
+      </button>
+    </th>
+    """
+  end
 end

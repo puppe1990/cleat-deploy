@@ -9,6 +9,14 @@ defmodule CleatDeploy.Deployments do
   alias CleatDeploy.Deployments.Deployment
   alias CleatDeploy.Repo
 
+  def topic(app_id) when is_integer(app_id), do: "deployments:#{app_id}"
+
+  def subscribe(%App{id: app_id}), do: subscribe(app_id)
+
+  def subscribe(app_id) when is_integer(app_id) do
+    Phoenix.PubSub.subscribe(CleatDeploy.PubSub, topic(app_id))
+  end
+
   def create_deployment(%App{} = app, attrs) do
     attrs =
       attrs
@@ -19,6 +27,7 @@ defmodule CleatDeploy.Deployments do
     %Deployment{}
     |> Deployment.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_change()
   end
 
   def enqueue(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app, attrs)
@@ -116,7 +125,7 @@ defmodule CleatDeploy.Deployments do
   def claim_running(%Deployment{id: id}) do
     case Repo.transaction(fn -> do_claim_running(id) end) do
       {:ok, deployment} ->
-        {:ok, deployment}
+        broadcast_change({:ok, deployment})
 
       {:error, :server_busy} ->
         {:error, :server_busy}
@@ -215,6 +224,7 @@ defmodule CleatDeploy.Deployments do
           log: append_log(deployment.log, message)
         })
         |> Repo.update()
+        |> broadcast_change()
 
       %Deployment{} ->
         {:error, :invalid_status}
@@ -234,6 +244,7 @@ defmodule CleatDeploy.Deployments do
           log: append_log(deployment.log, message)
         })
         |> Repo.update()
+        |> broadcast_change()
 
       %Deployment{} ->
         {:error, :invalid_status}
@@ -242,6 +253,18 @@ defmodule CleatDeploy.Deployments do
         {:error, :invalid_status}
     end
   end
+
+  defp broadcast_change({:ok, %Deployment{} = deployment} = result) do
+    Phoenix.PubSub.broadcast(
+      CleatDeploy.PubSub,
+      topic(deployment.app_id),
+      {:deployment_changed, deployment.app_id}
+    )
+
+    result
+  end
+
+  defp broadcast_change(other), do: other
 
   defp append_log(existing, message) do
     [existing, message]
