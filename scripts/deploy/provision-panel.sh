@@ -6,8 +6,8 @@ cd "$ROOT"
 
 REGION="${AWS_REGION:-us-east-1}"
 AZ="${AWS_AVAILABILITY_ZONE:-us-east-1a}"
-INSTANCE_NAME="${LIGHTSAIL_INSTANCE:-phoenix-paas-panel}"
-STATIC_IP_NAME="${LIGHTSAIL_STATIC_IP:-phoenix-paas-ip}"
+INSTANCE_NAME="${LIGHTSAIL_INSTANCE:-cleat-deploy-panel}"
+STATIC_IP_NAME="${LIGHTSAIL_STATIC_IP:-cleat-deploy-ip}"
 KEY_PAIR_NAME="${LIGHTSAIL_KEY_PAIR:-}"
 BLUEPRINT_ID="${LIGHTSAIL_BLUEPRINT:-ubuntu_22_04}"
 BUNDLE_ID="${LIGHTSAIL_BUNDLE:-micro_3_0}"
@@ -116,7 +116,7 @@ print_summary() {
 
   cat >&2 <<EOF
 
-Phoenix PaaS panel provisioned in ${REGION}
+Cleat panel provisioned in ${REGION}
 
   Instance:  ${INSTANCE_NAME}
   Bundle:    ${BUNDLE_ID}

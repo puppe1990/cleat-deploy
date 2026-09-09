@@ -3,14 +3,14 @@
 
 import Ecto.Query
 
-alias PhoenixPaas.{Apps, Deployments, Repo, Seeds}
-alias PhoenixPaas.Deploy.SshRunner
+alias CleatDeploy.{Apps, Deployments, Repo, Seeds}
+alias CleatDeploy.Deploy.SshRunner
 
 for app <- [:crypto, :ecto_sql, :ecto_sqlite3, :cloak, :cloak_ecto] do
   {:ok, _} = Application.ensure_all_started(app)
 end
 
-for child <- [PhoenixPaas.Repo, PhoenixPaas.Vault] do
+for child <- [CleatDeploy.Repo, CleatDeploy.Vault] do
   {:ok, _} = child.start_link()
 end
 

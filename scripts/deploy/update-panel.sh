@@ -52,15 +52,36 @@ main() {
   [[ -f "$DEPLOY_SSH_KEY" ]] || die "SSH key not found: $DEPLOY_SSH_KEY"
   chmod 600 "$DEPLOY_SSH_KEY"
 
+  log "Migrating panel paths from phoenix_paas if needed"
+  scp -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new \
+    "$ROOT/deploy/cleat_deploy.service" \
+    "${DEPLOY_USER}@${DEPLOY_IP}:/tmp/cleat_deploy.service"
+  ssh_cmd bash -s <<'REMOTE'
+set -euo pipefail
+if [[ -d /opt/phoenix_paas && ! -e /opt/cleat_deploy ]]; then
+  sudo mv /opt/phoenix_paas /opt/cleat_deploy
+fi
+if [[ -d /etc/phoenix_paas && ! -e /etc/cleat_deploy ]]; then
+  sudo mv /etc/phoenix_paas /etc/cleat_deploy
+fi
+sudo mv /tmp/cleat_deploy.service /etc/systemd/system/cleat_deploy.service
+sudo systemctl daemon-reload
+if systemctl list-unit-files | grep -q '^phoenix_paas.service'; then
+  sudo systemctl stop phoenix_paas || true
+  sudo systemctl disable phoenix_paas || true
+fi
+sudo systemctl enable cleat_deploy
+REMOTE
+
   "$ROOT/scripts/deploy/build-on-panel-server.sh"
 
   log "Running migrations"
   ssh_cmd bash -s <<'REMOTE'
 set -euo pipefail
-if [[ -f /etc/phoenix_paas/env ]]; then
-  sudo bash -c 'set -a; source /etc/phoenix_paas/env; set +a; /opt/phoenix_paas/current/bin/migrate'
+if [[ -f /etc/cleat_deploy/env ]]; then
+  sudo bash -c 'set -a; source /etc/cleat_deploy/env; set +a; /opt/cleat_deploy/current/bin/migrate'
 else
-  echo "No /etc/phoenix_paas/env — skipping migrations" >&2
+  echo "No /etc/cleat_deploy/env — skipping migrations" >&2
 fi
 REMOTE
 
@@ -68,12 +89,12 @@ REMOTE
     log "Running seeds"
     ssh_cmd bash -s <<REMOTE
 set -euo pipefail
-sudo bash -c "set -a; source /etc/phoenix_paas/env; set +a; export SEED_USER_PASSWORD='${SEED_USER_PASSWORD}'; export SEED_SSH_KEY_PATH='${SEED_SSH_KEY_PATH}'; /opt/phoenix_paas/current/bin/phoenix_paas eval 'PhoenixPaas.Release.seed()'"
+sudo bash -c "set -a; source /etc/cleat_deploy/env; set +a; export SEED_USER_PASSWORD='${SEED_USER_PASSWORD}'; export SEED_SSH_KEY_PATH='${SEED_SSH_KEY_PATH}'; /opt/cleat_deploy/current/bin/cleat_deploy eval 'CleatDeploy.Release.seed()'"
 REMOTE
   fi
 
-  log "Restarting phoenix_paas"
-  ssh_cmd "sudo systemctl restart phoenix_paas && sleep 3 && sudo systemctl is-active phoenix_paas"
+  log "Restarting cleat_deploy"
+  ssh_cmd "sudo systemctl restart cleat_deploy && sleep 3 && sudo systemctl is-active cleat_deploy"
 
   log "Panel updated — https://${DEPLOY_HOST}"
 }

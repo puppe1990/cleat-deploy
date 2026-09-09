@@ -22,7 +22,7 @@ import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
-import {hooks as colocatedHooks} from "phoenix-colocated/phoenix_paas"
+import {hooks as colocatedHooks} from "phoenix-colocated/cleat_deploy"
 import topbar from "../vendor/topbar"
 import {initPasswordToggles} from "./password_toggle"
 import {initTheme, ThemeToggle} from "./theme"

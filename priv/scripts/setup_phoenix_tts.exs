@@ -1,6 +1,6 @@
 # Run on panel:
-#   bin/phoenix_paas rpc "Code.eval_file('priv/scripts/setup_phoenix_tts.exs')"
-alias PhoenixPaas.{Accounts, Apps, Deployments, Repo, Servers}
+#   bin/cleat_deploy rpc "Code.eval_file('priv/scripts/setup_phoenix_tts.exs')"
+alias CleatDeploy.{Accounts, Apps, Deployments, Repo, Servers}
 import Ecto.Query
 
 email = "matheus.puppe@gmail.com"

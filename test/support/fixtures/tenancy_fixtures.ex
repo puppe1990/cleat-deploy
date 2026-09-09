@@ -1,10 +1,10 @@
-defmodule PhoenixPaas.TenancyFixtures do
+defmodule CleatDeploy.TenancyFixtures do
   @moduledoc false
 
-  alias PhoenixPaas.{Apps, Servers}
-  alias PhoenixPaas.Accounts
-  alias PhoenixPaas.Accounts.Scope
-  alias PhoenixPaas.AccountsFixtures
+  alias CleatDeploy.{Apps, Servers}
+  alias CleatDeploy.Accounts
+  alias CleatDeploy.Accounts.Scope
+  alias CleatDeploy.AccountsFixtures
 
   def scope_fixture(attrs \\ %{}) do
     {:ok, %{user: user, tenant: tenant}} =

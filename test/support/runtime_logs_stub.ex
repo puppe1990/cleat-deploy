@@ -1,6 +1,6 @@
-defmodule PhoenixPaas.Apps.RuntimeLogsStub do
+defmodule CleatDeploy.Apps.RuntimeLogsStub do
   @moduledoc false
-  @behaviour PhoenixPaas.Apps.RuntimeLogs
+  @behaviour CleatDeploy.Apps.RuntimeLogs
 
   @impl true
   def run(app, _argv) do

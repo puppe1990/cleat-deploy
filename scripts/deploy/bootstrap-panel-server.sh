@@ -50,14 +50,14 @@ main() {
   [[ -f "$DEPLOY_SSH_KEY" ]] || die "SSH key not found: $DEPLOY_SSH_KEY"
   chmod 600 "$DEPLOY_SSH_KEY"
 
-  log "Bootstrapping Phoenix PaaS panel on $DEPLOY_USER@$DEPLOY_IP"
+  log "Bootstrapping Cleat panel on $DEPLOY_USER@$DEPLOY_IP"
 
-  scp_to_server "$ROOT/deploy/phoenix_paas.service" "/tmp/phoenix_paas.service"
+  scp_to_server "$ROOT/deploy/cleat_deploy.service" "/tmp/cleat_deploy.service"
 
   if [[ -f "$ENV_FILE" ]]; then
-    scp_to_server "$ENV_FILE" "/tmp/phoenix_paas.env"
+    scp_to_server "$ENV_FILE" "/tmp/cleat_deploy.env"
   else
-    log "No env file at $ENV_FILE — copy deploy/env.production.example and retry, or upload /etc/phoenix_paas/env manually"
+    log "No env file at $ENV_FILE — copy deploy/env.production.example and retry, or upload /etc/cleat_deploy/env manually"
   fi
 
   if [[ -n "$DEPLOY_HOST" ]]; then
@@ -101,17 +101,17 @@ if ! command -v caddy >/dev/null 2>&1; then
   sudo apt-get install -y caddy
 fi
 
-sudo mkdir -p /opt/phoenix_paas/releases /etc/phoenix_paas
+sudo mkdir -p /opt/cleat_deploy/releases /etc/cleat_deploy
 
-if [[ -f /tmp/phoenix_paas.env ]]; then
+if [[ -f /tmp/cleat_deploy.env ]]; then
   log "Installing production env"
-  sudo mv /tmp/phoenix_paas.env /etc/phoenix_paas/env
-  sudo chmod 600 /etc/phoenix_paas/env
+  sudo mv /tmp/cleat_deploy.env /etc/cleat_deploy/env
+  sudo chmod 600 /etc/cleat_deploy/env
 fi
 
-sudo mv /tmp/phoenix_paas.service /etc/systemd/system/phoenix_paas.service
+sudo mv /tmp/cleat_deploy.service /etc/systemd/system/cleat_deploy.service
 sudo systemctl daemon-reload
-sudo systemctl enable phoenix_paas
+sudo systemctl enable cleat_deploy
 
 if [[ -n "${DEPLOY_HOST:-}" && -f /tmp/Caddyfile ]]; then
   log "Configuring Caddy for ${DEPLOY_HOST}"

@@ -1,4 +1,4 @@
-alias PhoenixPaas.Seeds
+alias CleatDeploy.Seeds
 
 {:ok, %{user: user, scope: scope}} = Seeds.run()
 

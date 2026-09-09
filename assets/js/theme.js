@@ -1,8 +1,9 @@
-const STORAGE_KEY = "phoenix-paas-theme"
+const STORAGE_KEY = "cleat-theme"
+const LEGACY_KEY = "phoenix-paas-theme"
 
 export function currentTheme() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_KEY)
     if (stored === "light" || stored === "dark") return stored
   } catch (_error) {
     // ignore

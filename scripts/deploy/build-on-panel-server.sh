@@ -36,7 +36,7 @@ main() {
   [[ -f "$DEPLOY_SSH_KEY" ]] || die "SSH key not found: $DEPLOY_SSH_KEY"
   chmod 600 "$DEPLOY_SSH_KEY"
 
-  tarball="$(mktemp -t phoenix_paas_src.XXXXXX.tar.gz)"
+  tarball="$(mktemp -t cleat_deploy_src.XXXXXX.tar.gz)"
   trap 'rm -f "${tarball:-}"' EXIT
 
   log "Packaging source for server build"
@@ -51,7 +51,7 @@ main() {
 
   log "Uploading source to $DEPLOY_USER@$DEPLOY_IP"
   scp -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new \
-    "$tarball" "${DEPLOY_USER}@${DEPLOY_IP}:/tmp/phoenix_paas_src.tar.gz"
+    "$tarball" "${DEPLOY_USER}@${DEPLOY_IP}:/tmp/cleat_deploy_src.tar.gz"
 
   log "Building release on server (linux/amd64)"
   ssh -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new \
@@ -74,10 +74,10 @@ mise use -g erlang@28.4.1 elixir@1.19.5-otp-28
 
 log "Elixir $(elixir --version | head -1)"
 
-rm -rf ~/phoenix_paas_build
-mkdir -p ~/phoenix_paas_build
-tar -xzf /tmp/phoenix_paas_src.tar.gz -C ~/phoenix_paas_build
-cd ~/phoenix_paas_build
+rm -rf ~/cleat_deploy_build
+mkdir -p ~/cleat_deploy_build
+tar -xzf /tmp/cleat_deploy_src.tar.gz -C ~/cleat_deploy_build
+cd ~/cleat_deploy_build
 
 export MIX_ENV=prod
 export SECRET_KEY_BASE=buildtime_secret_key_base_32chars_min
@@ -91,12 +91,12 @@ mix assets.setup
 mix assets.deploy
 mix release --overwrite
 
-RELEASE_DIR="/opt/phoenix_paas/releases/build"
+RELEASE_DIR="/opt/cleat_deploy/releases/build"
 sudo mkdir -p "$RELEASE_DIR"
 sudo rm -rf "${RELEASE_DIR:?}"/*
-sudo cp -a _build/prod/rel/phoenix_paas/. "$RELEASE_DIR/"
-sudo ln -sfn "$RELEASE_DIR" /opt/phoenix_paas/current
-sudo rm -f /tmp/phoenix_paas_src.tar.gz
+sudo cp -a _build/prod/rel/cleat_deploy/. "$RELEASE_DIR/"
+sudo ln -sfn "$RELEASE_DIR" /opt/cleat_deploy/current
+sudo rm -f /tmp/cleat_deploy_src.tar.gz
 log "Server build complete"
 REMOTE
 

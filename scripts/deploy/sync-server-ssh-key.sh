@@ -23,20 +23,20 @@ if [[ ! -f "$APPS_SSH_KEY" ]]; then
   exit 1
 fi
 
-REMOTE_KEY="/tmp/phoenix_paas_apps_ssh_key.pem"
+REMOTE_KEY="/tmp/cleat_deploy_apps_ssh_key.pem"
 
 scp -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new \
   "$APPS_SSH_KEY" "${DEPLOY_USER}@${DEPLOY_IP}:${REMOTE_KEY}"
 
 ssh -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${DEPLOY_IP}" \
-  "sudo chmod 600 ${REMOTE_KEY} && cd /opt/phoenix_paas/current && sudo bash -c 'set -a; source /etc/phoenix_paas/env; set +a; bin/phoenix_paas rpc \"
+  "sudo chmod 600 ${REMOTE_KEY} && cd /opt/cleat_deploy/current && sudo bash -c 'set -a; source /etc/cleat_deploy/env; set +a; bin/cleat_deploy rpc \"
 key = File.read!(\\\"${REMOTE_KEY}\\\")
-server = PhoenixPaas.Repo.get!(PhoenixPaas.Servers.Server, 1)
+server = CleatDeploy.Repo.get!(CleatDeploy.Servers.Server, 1)
 {:ok, updated} =
   server
-  |> PhoenixPaas.Servers.Server.changeset(%{ssh_private_key: key})
-  |> PhoenixPaas.Repo.update()
-IO.puts(\\\"ssh_key_configured=\\\#{PhoenixPaas.Servers.ssh_key_configured?(updated)}\\\")
+  |> CleatDeploy.Servers.Server.changeset(%{ssh_private_key: key})
+  |> CleatDeploy.Repo.update()
+IO.puts(\\\"ssh_key_configured=\\\#{CleatDeploy.Servers.ssh_key_configured?(updated)}\\\")
 \"' && sudo rm -f ${REMOTE_KEY}"
 
 echo "→ SSH key synced to PaaS server record"

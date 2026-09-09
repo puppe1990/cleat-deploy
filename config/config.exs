@@ -7,32 +7,32 @@
 # General application configuration
 import Config
 
-config :phoenix_paas, :scopes,
+config :cleat_deploy, :scopes,
   user: [
     default: true,
-    module: PhoenixPaas.Accounts.Scope,
+    module: CleatDeploy.Accounts.Scope,
     assign_key: :current_scope,
     access_path: [:user, :id],
     schema_key: :user_id,
     schema_type: :id,
     schema_table: :users,
-    test_data_fixture: PhoenixPaas.AccountsFixtures,
+    test_data_fixture: CleatDeploy.AccountsFixtures,
     test_setup_helper: :register_and_log_in_user
   ]
 
-config :phoenix_paas,
-  ecto_repos: [PhoenixPaas.Repo],
+config :cleat_deploy,
+  ecto_repos: [CleatDeploy.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-config :phoenix_paas, :lightsail_client, PhoenixPaas.AWS.Lightsail.Stub
-config :phoenix_paas, :hetzner_client, PhoenixPaas.Hetzner.Stub
-config :phoenix_paas, :runtime_logs, PhoenixPaas.Apps.RuntimeLogsSsh
-config :phoenix_paas, :runtime_memory, PhoenixPaas.Apps.RuntimeLogsSsh
+config :cleat_deploy, :lightsail_client, CleatDeploy.AWS.Lightsail.Stub
+config :cleat_deploy, :hetzner_client, CleatDeploy.Hetzner.Stub
+config :cleat_deploy, :runtime_logs, CleatDeploy.Apps.RuntimeLogsSsh
+config :cleat_deploy, :runtime_memory, CleatDeploy.Apps.RuntimeLogsSsh
 
-config :phoenix_paas, :auto_deploy_health_on_boot, true
+config :cleat_deploy, :auto_deploy_health_on_boot, true
 
-config :phoenix_paas, Oban,
-  repo: PhoenixPaas.Repo,
+config :cleat_deploy, Oban,
+  repo: CleatDeploy.Repo,
   engine: Oban.Engines.Lite,
   prefix: false,
   notifier: Oban.Notifiers.Isolated,
@@ -44,26 +44,26 @@ config :phoenix_paas, Oban,
     Oban.Plugins.Pruner,
     {Oban.Plugins.Cron,
      crontab: [
-       {"*/15 * * * *", PhoenixPaas.Workers.AutoDeployHealthWorker}
+       {"*/15 * * * *", CleatDeploy.Workers.AutoDeployHealthWorker}
      ]}
   ],
   shutdown_grace_period: :timer.minutes(15)
 
 # Configure the endpoint
-config :phoenix_paas, PhoenixPaasWeb.Endpoint,
+config :cleat_deploy, CleatDeployWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: PhoenixPaasWeb.ErrorHTML, json: PhoenixPaasWeb.ErrorJSON],
+    formats: [html: CleatDeployWeb.ErrorHTML, json: CleatDeployWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: PhoenixPaas.PubSub,
+  pubsub_server: CleatDeploy.PubSub,
   live_view: [signing_salt: "lEUtsEZC"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  phoenix_paas: [
+  cleat_deploy: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -73,7 +73,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  phoenix_paas: [
+  cleat_deploy: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css

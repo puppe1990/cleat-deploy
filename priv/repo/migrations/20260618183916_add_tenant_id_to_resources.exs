@@ -1,4 +1,4 @@
-defmodule PhoenixPaas.Repo.Migrations.AddTenantIdToResources do
+defmodule CleatDeploy.Repo.Migrations.AddTenantIdToResources do
   use Ecto.Migration
 
   def change do

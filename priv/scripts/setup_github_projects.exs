@@ -1,9 +1,9 @@
 # Register GitHub Projects (puppe1990/github-projects-viewer-cais) on gestaobem-cx33.
 #
 # On the production panel:
-#   bin/phoenix_paas rpc "Code.eval_file(\"priv/scripts/setup_github_projects.exs\")"
+#   bin/cleat_deploy rpc "Code.eval_file(\"priv/scripts/setup_github_projects.exs\")"
 
-alias PhoenixPaas.{Accounts, Apps, Deployments, Repo, Servers}
+alias CleatDeploy.{Accounts, Apps, Deployments, Repo, Servers}
 import Ecto.Query
 
 email = "matheus.puppe@gmail.com"

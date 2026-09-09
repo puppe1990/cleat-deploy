@@ -22,7 +22,7 @@ fi
 SSH=(ssh -i "$DEPLOY_SSH_KEY" -o StrictHostKeyChecking=accept-new "${DEPLOY_USER}@${DEPLOY_IP}")
 
 if [[ "$FOLLOW" == "true" ]]; then
-  "${SSH[@]}" "sudo journalctl -u phoenix_paas -n ${LINES} -f --no-pager"
+  "${SSH[@]}" "sudo journalctl -u cleat_deploy -u phoenix_paas -n ${LINES} -f --no-pager"
 else
-  "${SSH[@]}" "sudo journalctl -u phoenix_paas -n ${LINES} --no-pager"
+  "${SSH[@]}" "sudo journalctl -u cleat_deploy -u phoenix_paas -n ${LINES} --no-pager"
 fi

@@ -12,54 +12,54 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/phoenix_paas start
+#     PHX_SERVER=true bin/cleat_deploy start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") && config_env() != :test do
-  config :phoenix_paas, PhoenixPaasWeb.Endpoint, server: true
+  config :cleat_deploy, CleatDeployWeb.Endpoint, server: true
 end
 
 if config_env() != :test do
-  config :phoenix_paas, PhoenixPaasWeb.Endpoint,
+  config :cleat_deploy, CleatDeployWeb.Endpoint,
     http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
   deploy_runner =
     case System.get_env("DEPLOY_RUNNER", "fake") do
-      "ssh" -> PhoenixPaas.Deploy.SshRunner
-      _ -> PhoenixPaas.Deploy.FakeRunner
+      "ssh" -> CleatDeploy.Deploy.SshRunner
+      _ -> CleatDeploy.Deploy.FakeRunner
     end
 
-  config :phoenix_paas, :deploy_runner, deploy_runner
+  config :cleat_deploy, :deploy_runner, deploy_runner
 
   lightsail_client =
     if System.get_env("AWS_ACCESS_KEY_ID") in [nil, ""] do
-      PhoenixPaas.AWS.Lightsail.Stub
+      CleatDeploy.AWS.Lightsail.Stub
     else
-      PhoenixPaas.AWS.Lightsail.ExAwsClient
+      CleatDeploy.AWS.Lightsail.ExAwsClient
     end
 
-  config :phoenix_paas, :lightsail_client, lightsail_client
+  config :cleat_deploy, :lightsail_client, lightsail_client
 
   hetzner_client =
     if System.get_env("HCLOUD_TOKEN") in [nil, ""] and
          System.get_env("HETZNER_API_TOKEN") in [nil, ""] do
-      PhoenixPaas.Hetzner.Stub
+      CleatDeploy.Hetzner.Stub
     else
-      PhoenixPaas.Hetzner.Client
+      CleatDeploy.Hetzner.Client
     end
 
-  config :phoenix_paas, :hetzner_client, hetzner_client
+  config :cleat_deploy, :hetzner_client, hetzner_client
 end
 
 if config_env() == :prod do
-  config :phoenix_paas, PhoenixPaas.Repo, PhoenixPaas.Config.Turso.repo_config()
+  config :cleat_deploy, CleatDeploy.Repo, CleatDeploy.Config.Turso.repo_config()
 
   cloak_key =
     System.get_env("CLOAK_KEY") ||
       raise "environment variable CLOAK_KEY is missing (32-byte base64 key)"
 
-  config :phoenix_paas, PhoenixPaas.Vault,
+  config :cleat_deploy, CleatDeploy.Vault,
     ciphers: [
       default: {Cloak.Ciphers.AES.GCM, tag: "v1", key: Base.decode64!(cloak_key)}
     ]
@@ -78,9 +78,9 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
-  config :phoenix_paas, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :cleat_deploy, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :phoenix_paas, PhoenixPaasWeb.Endpoint,
+  config :cleat_deploy, CleatDeployWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -96,7 +96,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :phoenix_paas, PhoenixPaasWeb.Endpoint,
+  #     config :cleat_deploy, CleatDeployWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -118,7 +118,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :phoenix_paas, PhoenixPaasWeb.Endpoint,
+  #     config :cleat_deploy, CleatDeployWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
