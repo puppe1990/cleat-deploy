@@ -33,8 +33,9 @@ export const ChartTip = {
     const hair = this.el.querySelector("[data-chart-line]")
     if (!svg || !tip) return
 
-    const svgRect = svg.getBoundingClientRect()
-    const x = ((event.clientX - svgRect.left) / Math.max(svgRect.width, 1)) * this.viewWidth
+    const x = this.svgUserX(svg, event.clientX)
+    if (x == null) return
+
     let best = this.points[0]
     let bestDelta = Infinity
 
@@ -46,17 +47,19 @@ export const ChartTip = {
       }
     }
 
-    const left = (best.x / this.viewWidth) * svgRect.width
-    const flip = best.x / this.viewWidth > 0.62
+    const left = this.overlayX(svg, best.x)
+    if (left == null) return
 
-    tip.style.left = `${left}px`
-    tip.style.transform = flip ? "translate(-108%, 0)" : "translate(8px, 0)"
     tip.querySelector("[data-chart-tip-label]").textContent = best.label || ""
-    tip.querySelector("[data-chart-tip-value]").textContent = (best.lines || [best.value]).filter(Boolean).join("\n")
+    tip.querySelector("[data-chart-tip-value]").textContent = (best.lines || [best.value])
+      .filter(Boolean)
+      .join("\n")
     tip.classList.remove("hidden")
+    this.placeTip(tip, left)
 
     if (hair) {
       hair.style.left = `${left}px`
+      hair.style.height = `${svg.getBoundingClientRect().height}px`
       hair.classList.remove("hidden")
     }
   },
@@ -64,5 +67,37 @@ export const ChartTip = {
   hide() {
     this.el.querySelector("[data-chart-tip]")?.classList.add("hidden")
     this.el.querySelector("[data-chart-line]")?.classList.add("hidden")
+  },
+
+  svgUserX(svg, clientX) {
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return null
+
+    const point = svg.createSVGPoint()
+    point.x = clientX
+    point.y = 0
+    const userX = point.matrixTransform(ctm.inverse()).x
+    return Math.min(this.viewWidth, Math.max(0, userX))
+  },
+
+  overlayX(svg, userX) {
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return null
+
+    const point = svg.createSVGPoint()
+    point.x = userX
+    point.y = 0
+    return point.matrixTransform(ctm).x - this.el.getBoundingClientRect().left
+  },
+
+  placeTip(tip, hairLeft) {
+    tip.style.transform = "none"
+    tip.style.left = "0px"
+    const tipWidth = tip.offsetWidth
+    const layerWidth = this.el.clientWidth
+    const margin = 4
+    const centered = hairLeft - tipWidth / 2
+    const left = Math.max(margin, Math.min(centered, layerWidth - tipWidth - margin))
+    tip.style.left = `${left}px`
   },
 }

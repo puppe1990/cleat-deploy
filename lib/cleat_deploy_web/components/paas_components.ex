@@ -391,17 +391,18 @@ defmodule CleatDeployWeb.PaasComponents do
 
     bar_w = 18
     gap = 2
-    width = max(length(assigns.days) * (bar_w + gap), 1)
-    height = 112
+    slot = bar_w + gap
+    width = max(length(assigns.days) * slot, 1)
+    height = 96
 
     bars =
       Enum.with_index(assigns.days, fn day, i ->
-        x = i * (bar_w + gap)
+        x = i * slot
         total = day.success + day.failed
-        total_h = total / max_v * (height - 16)
-        fail_h = if total == 0, do: 0, else: day.failed / max_v * (height - 16)
+        total_h = total / max_v * height
+        fail_h = if total == 0, do: 0, else: day.failed / max_v * height
         success_h = total_h - fail_h
-        y_fail = height - 14 - fail_h
+        y_fail = height - fail_h
         y_ok = y_fail - success_h
 
         %{
@@ -413,17 +414,21 @@ defmodule CleatDeployWeb.PaasComponents do
           label: day.label,
           date: day.date,
           success: day.success,
-          failed: day.failed
+          failed: day.failed,
+          total: total
         }
       end)
 
     points =
       Enum.map(bars, fn bar ->
-        %{
-          x: bar.x + bar_w / 2,
-          label: bar.date,
-          lines: ["#{bar.success} success", "#{bar.failed} failed"]
-        }
+        lines =
+          if bar.total == 0 do
+            ["No deploys"]
+          else
+            ["#{bar.success} success", "#{bar.failed} failed"]
+          end
+
+        %{x: bar.x + bar_w / 2, label: bar.date, lines: lines}
       end)
 
     assigns =
@@ -438,7 +443,8 @@ defmodule CleatDeployWeb.PaasComponents do
       <.chart_hover_layer id={"#{@id}-plot"} points={@points} view_width={@width}>
         <svg
           viewBox={"0 0 #{@width} #{@height}"}
-          class="h-28 w-full"
+          preserveAspectRatio="none"
+          class="h-24 w-full"
           role="img"
           aria-label="Deployments last 14 days"
         >
@@ -465,21 +471,21 @@ defmodule CleatDeployWeb.PaasComponents do
               x={bar.x}
               y="0"
               width={@bar_w}
-              height={@height - 14}
+              height={@height}
               fill="transparent"
               class="cursor-crosshair"
             />
-            <text
-              x={bar.x + @bar_w / 2}
-              y={@height - 2}
-              text-anchor="middle"
-              class="fill-current text-[7px] text-hd-muted"
-            >
-              {bar.label}
-            </text>
           </g>
         </svg>
       </.chart_hover_layer>
+      <div id={"#{@id}-labels"} class="mt-1 flex">
+        <span
+          :for={bar <- @bars}
+          class="flex-1 text-center font-mono text-[9px] tabular-nums text-hd-muted"
+        >
+          {bar.label}
+        </span>
+      </div>
       <div class="mt-1 flex gap-3 font-mono text-[10px] text-hd-muted">
         <span class="inline-flex items-center gap-1">
           <span class="size-1.5 rounded-full bg-hd-green" /> Success
