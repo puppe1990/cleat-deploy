@@ -39,6 +39,7 @@ defmodule CleatDeployWeb.AppLive.Show do
 
     socket =
       if connected?(socket) do
+        :ok = Deployments.subscribe(app)
         send(self(), :load_app_memory)
         socket
       else
@@ -106,13 +107,15 @@ defmodule CleatDeployWeb.AppLive.Show do
   end
 
   def handle_info(:poll_deployments, socket) do
-    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
-
-    {:noreply,
-     socket
-     |> assign(:deploying?, deploying?)
-     |> schedule_poll(deploying?)}
+    {:noreply, refresh_deploying(socket)}
   end
+
+  def handle_info({:deployment_changed, app_id}, socket)
+      when app_id == socket.assigns.app.id do
+    {:noreply, refresh_deploying(socket)}
+  end
+
+  def handle_info({:deployment_changed, _app_id}, socket), do: {:noreply, socket}
 
   @impl true
   def render(assigns) do
@@ -356,6 +359,14 @@ defmodule CleatDeployWeb.AppLive.Show do
       </div>
     </Layouts.app>
     """
+  end
+
+  defp refresh_deploying(socket) do
+    deploying? = Deployments.deploying?(socket.assigns.current_scope, socket.assigns.app)
+
+    socket
+    |> assign(:deploying?, deploying?)
+    |> schedule_poll(deploying?)
   end
 
   defp schedule_poll(socket, true) do

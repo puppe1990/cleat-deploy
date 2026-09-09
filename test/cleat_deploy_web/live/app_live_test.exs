@@ -97,6 +97,92 @@ defmodule CleatDeployWeb.AppLiveTest do
     assert has_element?(view, "#app-#{go_app.id}-disk", "500 MB")
   end
 
+  test "filters registered apps by search query", %{conn: conn, scope: scope, server: server} do
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Atelie",
+      slug: "atelie",
+      github_repo: "puppe1990/atelie",
+      host: "atelie.gestaobem.com"
+    })
+
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Vexo",
+      slug: "vexo",
+      github_repo: "puppe1990/vexo",
+      host: "vexo.gestaobem.com"
+    })
+
+    {:ok, view, _html} = live(conn, ~p"/apps")
+    assert has_element?(view, "#apps-filter")
+    assert render(view) =~ "Atelie"
+    assert render(view) =~ "Vexo"
+
+    view
+    |> form("#apps-filter", %{query: "vexo"})
+    |> render_change()
+
+    html = render(view)
+    assert html =~ "Vexo"
+    refute html =~ "Atelie"
+  end
+
+  test "filters registered apps by language", %{conn: conn, scope: scope, server: server} do
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Trip Planner",
+      slug: "trip-planner",
+      github_repo: "puppe1990/trip-planner-ia-phx",
+      host: "trip.gestaobem.com",
+      runtime: "phoenix"
+    })
+
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Atelie",
+      slug: "atelie",
+      github_repo: "puppe1990/atelie",
+      host: "atelie.gestaobem.com",
+      runtime: "golang"
+    })
+
+    {:ok, view, _html} = live(conn, ~p"/apps")
+    view |> element("#apps-filter-golang") |> render_click()
+
+    html = render(view)
+    assert html =~ "Atelie"
+    refute html =~ "Trip Planner"
+
+    view |> element("#apps-filter-phoenix") |> render_click()
+    html = render(view)
+    assert html =~ "Trip Planner"
+    refute html =~ "Atelie"
+  end
+
+  test "sorts registered apps when a column header is clicked", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Atelie",
+      slug: "atelie",
+      github_repo: "puppe1990/atelie",
+      host: "atelie.gestaobem.com"
+    })
+
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Vexo",
+      slug: "vexo",
+      github_repo: "puppe1990/vexo",
+      host: "vexo.gestaobem.com"
+    })
+
+    {:ok, view, html} = live(conn, ~p"/apps")
+    assert has_element?(view, "#sort-apps-name")
+    assert app_name_order(html) == ["Atelie", "Vexo"]
+
+    html = view |> element("#sort-apps-name") |> render_click()
+    assert app_name_order(html) == ["Vexo", "Atelie"]
+  end
+
   test "redirects app show to deployments page", %{conn: conn, scope: scope, server: server} do
     app = TenancyFixtures.app_fixture(scope, server)
 
@@ -200,6 +286,49 @@ defmodule CleatDeployWeb.AppLiveTest do
     assert render(view) =~ "Deploy queued"
   end
 
+  test "shows a deploy that starts while the page is open", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    refute html =~ "webhook-sha"
+
+    {:ok, deployment} =
+      Deployments.create_deployment(app, %{git_sha: "webhook-sha", triggered_by: "github"})
+
+    html = render(view)
+    assert html =~ "webhook-sha"
+    assert has_element?(view, "#deployments-#{deployment.id}")
+    assert has_element?(view, "#deploy-button", "Build in progress")
+  end
+
+  test "updates deploy status without a page refresh", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+    {:ok, deployment} = Deployments.create_deployment(app, %{git_sha: "live-sha"})
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    assert html =~ "queued"
+
+    {:ok, running} = Deployments.mark_running(deployment)
+    html = render(view)
+    assert html =~ "running"
+    assert has_element?(view, "#deployments-#{running.id}")
+    assert has_element?(view, "#deploy-button", "Build in progress")
+
+    {:ok, _success} = Deployments.mark_success(running, "deploy finished live")
+    html = render(view)
+    assert html =~ "success"
+    assert html =~ "deploy finished live"
+    refute has_element?(view, "#deploy-button", "Build in progress")
+  end
+
   test "shows deploy duration in history", %{conn: conn, scope: scope, server: server} do
     app = TenancyFixtures.app_fixture(scope, server)
 
@@ -264,5 +393,12 @@ defmodule CleatDeployWeb.AppLiveTest do
     assert html =~ "older deploy log line"
     assert has_element?(view, "#deploy-terminal-#{older.id}")
     refute has_element?(view, "#deploy-terminal-#{newer.id}")
+  end
+
+  defp app_name_order(html) do
+    html
+    |> then(&Regex.scan(~r/href="\/apps\/\d+\/deployments"[^>]*>\s*([^<]+)\s*</, &1))
+    |> Enum.map(fn [_, name] -> String.trim(name) end)
+    |> Enum.uniq()
   end
 end
