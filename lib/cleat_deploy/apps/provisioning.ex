@@ -111,6 +111,16 @@ defmodule CleatDeploy.Apps.Provisioning do
       systemd_unit: "github-projects",
       release_path: "/opt/github-projects",
       server_name: "gestaobem-cx33"
+    },
+    "puppe1990/cifra-finops" => %{
+      name: "Cifra",
+      slug: "cifra",
+      host: "finops.gestaobem.com",
+      port: 4022,
+      runtime: "golang",
+      systemd_unit: "cifra",
+      release_path: "/opt/cifra",
+      server_name: "gestaobem-cx33"
     }
   }
 

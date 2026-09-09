@@ -50,6 +50,11 @@ github.gestaobem.com {
 	reverse_proxy 127.0.0.1:4021
 }
 
+finops.gestaobem.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:4022
+}
+
 github.167.233.201.9.sslip.io {
 	encode gzip
 	reverse_proxy 127.0.0.1:4021
