@@ -1,8 +1,8 @@
 # Register the Hetzner CX33 in the panel and point Lightsail Phoenix/Go apps at it.
 #
-#   HETZNER_SERVER_IP=x.x.x.x bin/phoenix_paas rpc "Code.eval_file(\"priv/scripts/setup_hetzner.exs\")"
+#   HETZNER_SERVER_IP=x.x.x.x bin/cleat_deploy rpc "Code.eval_file(\"priv/scripts/setup_hetzner.exs\")"
 
-alias PhoenixPaas.{Accounts, Apps, Repo, Servers}
+alias CleatDeploy.{Accounts, Apps, Repo, Servers}
 import Ecto.Query
 
 email = "matheus.puppe@gmail.com"
@@ -130,7 +130,7 @@ reassign_slugs = [
   "decor",
   "open-drive",
   "pay-core",
-  "phoenix-paas"
+  "cleat-deploy"
 ]
 
 updated =

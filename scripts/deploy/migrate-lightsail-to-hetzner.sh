@@ -22,7 +22,7 @@ ATELIE_IP="${ATELIE_SERVER_IP:-3.211.110.141}"
 SSH_KEY="${DEPLOY_SSH_KEY:-$HOME/.ssh/lightsail-default-key-us-east-1.pem}"
 SSH_USER="${DEPLOY_USER:-ubuntu}"
 
-# phoenix_paas is built separately on the CX33 — do not overwrite it with the Lightsail release.
+# cleat_deploy is built separately on the CX33 — do not overwrite it with the Lightsail release.
 PHOENIX_APPS=(assistente catalog_platform festa_platform open_drive pay_core vexo)
 GO_APPS_CATALOGO=(leilao-erp trama-bras)
 GO_APPS_ATELIE=(atelie)
@@ -163,7 +163,7 @@ Update these A records to $HETZNER_IP:
   eletronicos.gestaobem.com
 
 Then on the panel:
-  HETZNER_SERVER_IP=$HETZNER_IP bin/phoenix_paas rpc "Code.eval_file(\\"priv/scripts/setup_hetzner.exs\\")"
+  HETZNER_SERVER_IP=$HETZNER_IP bin/cleat_deploy rpc "Code.eval_file(\\"priv/scripts/setup_hetzner.exs\\")"
 
 Leave Lightsail running until HTTPS and health checks pass on Hetzner.
 EOF

@@ -33,12 +33,12 @@ main() {
     "${DEPLOY_USER}@${DEPLOY_IP}" 'bash -s' <<'REMOTE'
 set -euo pipefail
 
-if [[ ! -f /etc/phoenix_paas/env ]]; then
-  echo "Error: /etc/phoenix_paas/env not found" >&2
+if [[ ! -f /etc/cleat_deploy/env ]]; then
+  echo "Error: /etc/cleat_deploy/env not found" >&2
   exit 1
 fi
 
-sudo bash -c 'set -a; source /etc/phoenix_paas/env; set +a; /opt/phoenix_paas/current/bin/phoenix_paas rpc "IO.inspect(PhoenixPaas.Apps.sync_all_github_webhooks(), label: \"webhook_sync\")"'
+sudo bash -c 'set -a; source /etc/cleat_deploy/env; set +a; /opt/cleat_deploy/current/bin/cleat_deploy rpc "IO.inspect(CleatDeploy.Apps.sync_all_github_webhooks(), label: \"webhook_sync\")"'
 REMOTE
 
   log "GitHub webhook provisioning finished"

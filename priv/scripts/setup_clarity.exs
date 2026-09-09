@@ -7,7 +7,7 @@ for app <- [:crypto, :ecto_sql, :ecto_sqlite3, :cloak, :cloak_ecto, :finch, :req
   {:ok, _} = Application.ensure_all_started(app)
 end
 
-for child <- [PhoenixPaas.Repo, PhoenixPaas.Vault] do
+for child <- [CleatDeploy.Repo, CleatDeploy.Vault] do
   {:ok, _} = child.start_link()
 end
 
@@ -16,14 +16,14 @@ webhook_host =
     System.get_env("PHX_HOST") ||
     "paas.gestaobem.com"
 
-Application.put_env(:phoenix_paas, PhoenixPaasWeb.Endpoint,
+Application.put_env(:cleat_deploy, CleatDeployWeb.Endpoint,
   server: false,
   url: [host: webhook_host, port: 443, scheme: "https"]
 )
 
-{:ok, _} = PhoenixPaasWeb.Endpoint.start_link()
+{:ok, _} = CleatDeployWeb.Endpoint.start_link()
 
-alias PhoenixPaas.{Accounts, Apps, Repo, Servers}
+alias CleatDeploy.{Accounts, Apps, Repo, Servers}
 import Ecto.Query
 
 email = "matheus.puppe@gmail.com"
@@ -133,7 +133,7 @@ IO.inspect(
     slug: app.slug,
     host: app.host,
     port: app.port,
-    release_name: PhoenixPaas.Apps.App.release_name(app.slug),
+    release_name: CleatDeploy.Apps.App.release_name(app.slug),
     server: server.name,
     server_ip: server.host_ip,
     release_path: app.release_path,

@@ -1,9 +1,9 @@
 # Register Vexo on the shared Lightsail host (catalogo-lightsail @ 52.73.89.19).
 #
 # On production panel:
-#   bin/phoenix_paas rpc "Code.eval_file(\"/tmp/setup_vexo.exs\")"
+#   bin/cleat_deploy rpc "Code.eval_file(\"/tmp/setup_vexo.exs\")"
 
-alias PhoenixPaas.{Accounts, Apps, Deployments, Repo, Servers}
+alias CleatDeploy.{Accounts, Apps, Deployments, Repo, Servers}
 import Ecto.Query
 
 email = "matheus.puppe@gmail.com"
@@ -91,7 +91,7 @@ IO.inspect(
     slug: app.slug,
     host: app.host,
     port: app.port,
-    release_name: PhoenixPaas.Apps.App.release_name(app.slug),
+    release_name: CleatDeploy.Apps.App.release_name(app.slug),
     server: server.name,
     server_ip: server.host_ip,
     webhook: webhook_status,

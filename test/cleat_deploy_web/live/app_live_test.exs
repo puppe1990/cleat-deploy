@@ -1,0 +1,268 @@
+defmodule CleatDeployWeb.AppLiveTest do
+  use CleatDeployWeb.ConnCase, async: false
+
+  import Phoenix.LiveViewTest
+
+  alias CleatDeploy.{Apps, Deployments}
+  alias CleatDeploy.TenancyFixtures
+
+  setup :register_and_log_in_user
+
+  setup %{scope: scope} do
+    server = TenancyFixtures.server_fixture(scope)
+    %{server: server}
+  end
+
+  test "renders plug-and-play new app form", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/apps/new")
+
+    assert has_element?(view, "#app-form")
+    assert html =~ "Register application"
+    assert html =~ "Pick a GitHub repository"
+    refute html =~ "Systemd unit"
+  end
+
+  test "auto-fills profile when github repo is selected", %{conn: conn, server: server} do
+    {:ok, view, _html} = live(conn, ~p"/apps/new")
+
+    html =
+      view
+      |> form("#app-form", app: %{github_repo: "puppe1990/trip-planner-ia-phx"})
+      |> render_change()
+
+    assert html =~ "app-provision-preview"
+    assert html =~ "Trip Planner"
+    assert html =~ "trip.gestaobem.com"
+    assert has_element?(view, "#save-app-button")
+
+    view
+    |> form("#app-form", app: %{github_repo: "puppe1990/trip-planner-ia-phx"})
+    |> render_submit()
+
+    app = Apps.get_app_by_repo("puppe1990/trip-planner-ia-phx")
+    assert app.name == "Trip Planner"
+    assert app.host == "trip.gestaobem.com"
+    assert app.server_id == server.id
+  end
+
+  test "lists apps", %{conn: conn, scope: scope, server: server} do
+    TenancyFixtures.app_fixture(scope, server, %{
+      name: "Trip Planner",
+      slug: "trip-planner",
+      github_repo: "puppe1990/trip-planner-ia-phx",
+      host: "trip.gestaobem.com"
+    })
+
+    {:ok, view, _html} = live(conn, ~p"/apps")
+    assert has_element?(view, "#apps-list")
+    assert has_element?(view, "#apps-table")
+    assert has_element?(view, "#apps-table th", "Main language")
+    assert has_element?(view, "#apps-table th", "RAM")
+    assert has_element?(view, "#apps-table th", "CPU")
+    assert has_element?(view, "#apps-table th", "Disk")
+    assert render(view) =~ "Trip Planner"
+  end
+
+  test "lists each app's main language", %{conn: conn, scope: scope, server: server} do
+    phoenix_app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Trip Planner",
+        slug: "trip-planner",
+        github_repo: "puppe1990/trip-planner-ia-phx",
+        host: "trip.gestaobem.com",
+        runtime: "phoenix"
+      })
+
+    go_app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Atelie",
+        slug: "atelie",
+        github_repo: "puppe1990/atelie",
+        host: "atelie.gestaobem.com",
+        runtime: "golang"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/apps")
+
+    assert has_element?(view, "#apps-table")
+    assert has_element?(view, "#apps-table th", "Main language")
+    assert has_element?(view, "#app-#{phoenix_app.id}-language", "Elixir")
+    assert has_element?(view, "#app-#{go_app.id}-language", "Go")
+    _ = :sys.get_state(view.pid)
+    assert has_element?(view, "#app-#{phoenix_app.id}-ram", "163 MB")
+    assert has_element?(view, "#app-#{phoenix_app.id}-cpu", "2.8%")
+    assert has_element?(view, "#app-#{phoenix_app.id}-disk", "510 MB")
+    assert has_element?(view, "#app-#{go_app.id}-ram", "173 MB")
+    assert has_element?(view, "#app-#{go_app.id}-cpu", "4.5%")
+    assert has_element?(view, "#app-#{go_app.id}-disk", "500 MB")
+  end
+
+  test "redirects app show to deployments page", %{conn: conn, scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    assert {:error, {:live_redirect, %{to: path}}} = live(conn, ~p"/apps/#{app.id}")
+    assert path == ~p"/apps/#{app.id}/deployments"
+  end
+
+  test "shows app with deployments and deploy button", %{conn: conn, scope: scope, server: server} do
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Trip Planner",
+        slug: "trip-planner",
+        github_repo: "puppe1990/trip-planner-ia-phx",
+        host: "trip.gestaobem.com"
+      })
+
+    {:ok, _deployment} = Deployments.create_deployment(app, %{git_sha: "abc123"})
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    assert has_element?(view, "#deploy-button")
+    assert has_element?(view, "#app-detail-tabs")
+    assert has_element?(view, "#deployments-history")
+    assert html =~ "Deployments Version History"
+    assert html =~ "abc123"
+    _ = :sys.get_state(view.pid)
+    assert has_element?(view, "#app-memory-tile", "163 MB")
+    assert has_element?(view, "#app-cpu-tile", "2.8%")
+    assert has_element?(view, "#app-disk-tile", "510 MB")
+  end
+
+  test "switches app detail tabs", %{conn: conn, scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    assert has_element?(view, "#app-detail-tab-deployments")
+    assert has_element?(view, "#app-deployments")
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}?tab=environment")
+
+    assert html =~ "Environment variables"
+    assert has_element?(view, "#app-env-vars")
+    refute has_element?(view, "#app-webhook")
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=webhook")
+    assert has_element?(view, "#app-webhook")
+    refute has_element?(view, "#app-env-vars")
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}?tab=logs")
+    assert has_element?(view, "#app-detail-tab-logs")
+    assert has_element?(view, "#app-runtime-logs")
+    assert has_element?(view, "#refresh-app-logs")
+    assert html =~ "2026-09-06T12:00:00Z"
+  end
+
+  test "keeps each journal line on a single numbered row", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=logs")
+
+    assert has_element?(view, "#log-line-1")
+    assert has_element?(view, "#log-line-2")
+    refute has_element?(view, "#log-line-3")
+    assert has_element?(view, "#log-line-2", "duration_ms")
+  end
+
+  test "shows environment variables with masked secrets", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, _} = Apps.put_env_var(app, "PORT", "4003")
+    {:ok, _} = Apps.put_env_var(app, "SECRET_KEY_BASE", "super-secret")
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}?tab=environment")
+    html = render(view)
+
+    assert html =~ "Environment variables"
+    assert has_element?(view, "#app-env-vars")
+    assert has_element?(view, "#env-var-PORT")
+    assert has_element?(view, "#env-var-SECRET_KEY_BASE")
+    assert html =~ "4003"
+    refute html =~ "super-secret"
+
+    view |> element("button", "Reveal secrets") |> render_click()
+    assert render(view) =~ "super-secret"
+  end
+
+  test "queues manual deploy", %{conn: conn, scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    view |> element("#deploy-button") |> render_click()
+
+    assert_enqueued(worker: CleatDeploy.Workers.DeployWorker)
+    assert render(view) =~ "Deploy queued"
+  end
+
+  test "shows deploy duration in history", %{conn: conn, scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, deployment} = Deployments.create_deployment(app, %{git_sha: "dur123"})
+
+    {:ok, finished} =
+      deployment
+      |> Ecto.Changeset.change(%{
+        status: :success,
+        started_at: ~U[2026-06-29 10:00:00Z],
+        finished_at: ~U[2026-06-29 10:01:30Z]
+      })
+      |> CleatDeploy.Repo.update()
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    assert html =~ "1m 30s"
+    assert has_element?(view, "#deployments-#{finished.id}")
+  end
+
+  test "views log from an older deployment", %{conn: conn, scope: scope, server: server} do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    {:ok, older} =
+      Deployments.create_deployment(app, %{
+        git_sha: "older-sha",
+        log: "older deploy log line"
+      })
+
+    {:ok, older} =
+      older
+      |> Ecto.Changeset.change(%{
+        status: :success,
+        started_at: ~U[2026-06-29 09:00:00Z],
+        finished_at: ~U[2026-06-29 09:01:00Z]
+      })
+      |> CleatDeploy.Repo.update()
+
+    {:ok, newer} =
+      Deployments.create_deployment(app, %{
+        git_sha: "newer-sha",
+        log: "newer deploy log line"
+      })
+
+    {:ok, newer} =
+      newer
+      |> Ecto.Changeset.change(%{
+        status: :success,
+        started_at: ~U[2026-06-29 10:00:00Z],
+        finished_at: ~U[2026-06-29 10:02:00Z]
+      })
+      |> CleatDeploy.Repo.update()
+
+    {:ok, view, html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    assert html =~ "newer deploy log line"
+    refute html =~ "older deploy log line"
+
+    view |> element("#view-deploy-log-#{older.id}") |> render_click()
+
+    html = render(view)
+    assert html =~ "older deploy log line"
+    assert has_element?(view, "#deploy-terminal-#{older.id}")
+    refute has_element?(view, "#deploy-terminal-#{newer.id}")
+  end
+end

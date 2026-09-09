@@ -1,9 +1,9 @@
-defmodule PhoenixPaas.MixProject do
+defmodule CleatDeploy.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :phoenix_paas,
+      app: :cleat_deploy,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule PhoenixPaas.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {PhoenixPaas.Application, []},
+      mod: {CleatDeploy.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end
@@ -90,10 +90,10 @@ defmodule PhoenixPaas.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind phoenix_paas", "esbuild phoenix_paas"],
+      "assets.build": ["compile", "tailwind cleat_deploy", "esbuild cleat_deploy"],
       "assets.deploy": [
-        "tailwind phoenix_paas --minify",
-        "esbuild phoenix_paas --minify",
+        "tailwind cleat_deploy --minify",
+        "esbuild cleat_deploy --minify",
         "phx.digest"
       ],
       precommit: [

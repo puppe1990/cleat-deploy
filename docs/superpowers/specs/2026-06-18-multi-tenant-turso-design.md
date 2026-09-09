@@ -1,4 +1,4 @@
-# Multi-tenant Phoenix PaaS + Turso (prod)
+# Multi-tenant Cleat + Turso (prod)
 
 **Date:** 2026-06-18  
 **Status:** Proposed — awaiting approval  
@@ -104,8 +104,8 @@ end
 
 | Env | DB |
 |-----|-----|
-| `test` | SQLite in-memory / `phoenix_paas_test.db` (fast, isolated) |
-| `dev` | SQLite `phoenix_paas_dev.db` |
+| `test` | SQLite in-memory / `cleat_deploy_test.db` (fast, isolated) |
+| `dev` | SQLite `cleat_deploy_dev.db` |
 | `prod` | Turso via `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` |
 
 Add `{:ecto_libsql, "~> 0.9"}` dependency; keep `ecto_sqlite3` for dev/test.

@@ -1,4 +1,4 @@
-defmodule PhoenixPaas.Repo.Migrations.AddObanJobsTable do
+defmodule CleatDeploy.Repo.Migrations.AddObanJobsTable do
   use Ecto.Migration
 
   def up do

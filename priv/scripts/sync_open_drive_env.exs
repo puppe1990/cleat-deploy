@@ -1,5 +1,5 @@
-alias PhoenixPaas.{Apps, Repo}
-alias PhoenixPaas.Apps.App
+alias CleatDeploy.{Apps, Repo}
+alias CleatDeploy.Apps.App
 
 app = Repo.get_by!(App, slug: "open-drive")
 

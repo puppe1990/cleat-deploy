@@ -1,4 +1,4 @@
-# Auto-deploy diagnosis (Phoenix PaaS)
+# Auto-deploy diagnosis (Cleat)
 
 ## How auto-deploy is supposed to work
 
@@ -38,7 +38,7 @@ So auto-deploy **queued and ran**, then **failed** mid-copy on the wrong host.
 ### Ops checklist after panel deploy
 ```bash
 # On paas host
-./bin/phoenix_paas rpc 'IO.inspect(PhoenixPaas.Apps.App.release_name("decor"))'
+./bin/cleat_deploy rpc 'IO.inspect(CleatDeploy.Apps.App.release_name("decor"))'
 # => "festa_platform"
 
 # Fix decor server if still wrong (prefer setup_decor.exs with prod env)

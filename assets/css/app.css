@@ -1,7 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../css";
 @source "../js";
-@source "../../lib/phoenix_paas_web";
+@source "../../lib/cleat_deploy_web";
 
 @plugin "../vendor/heroicons";
 

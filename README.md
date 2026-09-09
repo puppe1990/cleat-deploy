@@ -1,10 +1,12 @@
-# Phoenix PaaS
+# Cleat
 
 Control panel for deploying **Phoenix/Elixir** and **Go (Cais)** apps to **Hetzner Cloud** (CX33) or AWS Lightsail via GitHub webhooks.
 
+Formerly Phoenix PaaS. OTP app: `cleat_deploy`.
+
 Register VMs, link GitHub repos, trigger manual deploys or push-to-deploy, and watch builds in a live terminal.
 
-![Phoenix PaaS dashboard — Trip Planner deployed on Lightsail](docs/images/dashboard.jpg)
+![Cleat dashboard — Trip Planner deployed on Lightsail](docs/images/dashboard.jpg)
 
 ## Features
 
@@ -23,8 +25,8 @@ Register VMs, link GitHub repos, trigger manual deploys or push-to-deploy, and w
 ## Quick start
 
 ```bash
-git clone https://github.com/puppe1990/phoenix-paas.git
-cd phoenix-paas
+git clone https://github.com/puppe1990/cleat-deploy.git
+cd cleat-deploy
 mix setup
 mix phx.server
 ```
@@ -47,7 +49,7 @@ export HETZNER_SERVER_IP=x.x.x.x
 Then point Hostinger A records at the new IP and register the server in the panel:
 
 ```bash
-HETZNER_SERVER_IP=x.x.x.x bin/phoenix_paas rpc 'Code.eval_file("priv/scripts/setup_hetzner.exs")'
+HETZNER_SERVER_IP=x.x.x.x bin/cleat_deploy rpc 'Code.eval_file("priv/scripts/setup_hetzner.exs")'
 ```
 
 Leave Lightsail running until HTTPS on Hetzner is healthy.

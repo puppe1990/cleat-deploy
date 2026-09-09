@@ -21,7 +21,7 @@ main() {
   log "Building OTP release"
   mix release
 
-  log "Release ready at _build/prod/rel/phoenix_paas"
+  log "Release ready at _build/prod/rel/cleat_deploy"
 }
 
 main "$@"

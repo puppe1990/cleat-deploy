@@ -1,4 +1,4 @@
-defmodule PhoenixPaas.Repo.Migrations.AddDeployModeToServers do
+defmodule CleatDeploy.Repo.Migrations.AddDeployModeToServers do
   use Ecto.Migration
 
   def change do
