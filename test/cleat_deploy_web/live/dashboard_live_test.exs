@@ -4,6 +4,7 @@ defmodule CleatDeployWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
   import Mox
 
+  alias CleatDeploy.Deployments
   alias CleatDeploy.HetznerMock
   alias CleatDeploy.TenancyFixtures
   alias CleatDeployWeb.UserAuth
@@ -78,9 +79,44 @@ defmodule CleatDeployWeb.DashboardLiveTest do
     assert has_element?(view, "#chart-runtimes")
     assert has_element?(view, "#chart-deploys")
     assert has_element?(view, "#chart-deploys-plot")
+    assert has_element?(view, "#chart-deploys svg[preserveAspectRatio='none']")
+    assert has_element?(view, "#chart-deploys-labels")
     refute has_element?(view, "#dashboard-apps-table")
     refute has_element?(view, "#apps-table")
     refute html =~ "Registered Phoenix Applications"
+  end
+
+  test "deploy chart hover points skip 0/0 copy on empty days", %{conn: conn} do
+    {:ok, _view, html} = live(conn, ~p"/")
+
+    points = chart_points(html, "chart-deploys-plot")
+    assert length(points) == 14
+
+    for point <- points do
+      refute "0 success" in point["lines"]
+      refute "0 failed" in point["lines"]
+      assert point["lines"] == ["No deploys"]
+    end
+  end
+
+  test "deploy chart hover points show counts on days with deploys", %{
+    conn: conn,
+    scope: scope
+  } do
+    server = TenancyFixtures.server_fixture(scope)
+    app = TenancyFixtures.app_fixture(scope, server)
+    {:ok, queued} = Deployments.create_deployment(app, %{git_sha: "ok"})
+    {:ok, running} = Deployments.mark_running(queued)
+    {:ok, _} = Deployments.mark_success(running, "ok")
+
+    {:ok, _view, html} = live(conn, ~p"/")
+    points = chart_points(html, "chart-deploys-plot")
+    today = Date.utc_today() |> Date.to_iso8601()
+    match = Enum.find(points, &(&1["label"] == today))
+
+    assert match
+    assert "1 success" in match["lines"]
+    assert "0 failed" in match["lines"]
   end
 
   test "plots hetzner cpu samples on the dashboard", %{conn: conn, scope: scope} do
@@ -166,5 +202,11 @@ defmodule CleatDeployWeb.DashboardLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
     refute render(view) =~ "Secret App"
     assert scope.tenant.id != other.tenant.id
+  end
+
+  defp chart_points(html, id) do
+    {:ok, regex} = Regex.compile(~s/id="#{id}"[^>]*data-points="([^"]+)"/)
+    [_, encoded] = Regex.run(regex, html)
+    encoded |> String.replace("&quot;", "\"") |> Jason.decode!()
   end
 end
