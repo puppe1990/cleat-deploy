@@ -26,7 +26,12 @@ defmodule CleatDeployWeb.AppLive.Layout do
         </select>
       </div>
       <div class="text-xs text-hd-muted">
-        Repository mapping: <span class="font-mono text-hd-orange">{@app.github_repo}</span>
+        Repository mapping:
+        <.repo_link
+          id="app-repo-mapping"
+          repo={@app.github_repo}
+          class="font-mono text-hd-orange hover:text-hd-orange-dark"
+        />
       </div>
     </div>
     """
@@ -57,7 +62,7 @@ defmodule CleatDeployWeb.AppLive.Layout do
           <h2 class="font-display text-base font-semibold text-hd-text">{@app.name}</h2>
           <p class="flex items-center gap-1 font-mono text-[11px] text-hd-muted">
             <.icon name="hero-code-bracket" class="size-3" />
-            {@app.github_repo}
+            <.repo_link id="app-repo-hero" repo={@app.github_repo} class="hover:text-hd-text" />
             <span class="text-hd-border">|</span> branch: {@app.branch}
           </p>
         </div>
@@ -224,4 +229,22 @@ defmodule CleatDeployWeb.AppLive.Layout do
   end
 
   def parse_detail_tab(_), do: :environment
+
+  attr :id, :string, required: true
+  attr :repo, :string, required: true
+  attr :class, :string, required: true
+
+  defp repo_link(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      href={"https://github.com/#{@repo}"}
+      target="_blank"
+      rel="noopener noreferrer"
+      class={[@class, "transition-colors hover:underline"]}
+    >
+      {@repo}
+    </.link>
+    """
+  end
 end
