@@ -235,6 +235,33 @@ defmodule CleatDeployWeb.AppLiveTest do
     refute has_element?(view, "#app-runtime-badge", "PHX")
   end
 
+  test "links the repository to GitHub in the header and hero", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Cifra",
+        slug: "cifra",
+        github_repo: "puppe1990/cifra-finops",
+        host: "finops.gestaobem.com"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    for selector <- ["#app-repo-mapping", "#app-repo-hero"] do
+      assert has_element?(view, selector, "puppe1990/cifra-finops")
+
+      assert has_element?(view, ~s(#{selector}[target="_blank"][rel="noopener noreferrer"]))
+
+      assert has_element?(
+               view,
+               ~s(#{selector}[href="https://github.com/puppe1990/cifra-finops"])
+             )
+    end
+  end
+
   test "switches app detail tabs", %{conn: conn, scope: scope, server: server} do
     app = TenancyFixtures.app_fixture(scope, server)
 
