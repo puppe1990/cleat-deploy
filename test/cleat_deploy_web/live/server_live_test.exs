@@ -65,6 +65,30 @@ defmodule CleatDeployWeb.ServerLiveTest do
            )
   end
 
+  test "lets the user switch Hetzner plan prices between euro and dollar", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/servers/new")
+
+    assert has_element?(view, "#plan-currency-eur")
+    assert has_element?(view, "#plan-currency-usd")
+    assert has_element?(view, "#bundle-cx33-price", "€7.59/mo")
+    refute has_element?(view, "#bundle-cx33-price", "$8.80/mo")
+
+    view
+    |> element("#plan-currency-usd")
+    |> render_click()
+
+    assert has_element?(view, "#bundle-cx22-price", "$5.32/mo")
+    assert has_element?(view, "#bundle-cx33-price", "$8.80/mo")
+    refute has_element?(view, "#bundle-cx33-price", "€7.59/mo")
+
+    view
+    |> element("#plan-currency-eur")
+    |> render_click()
+
+    assert has_element?(view, "#bundle-cx33-price", "€7.59/mo")
+    refute has_element?(view, "#bundle-cx33-price", "$8.80/mo")
+  end
+
   test "registers an existing server from the fallback form", %{conn: conn, scope: scope} do
     {:ok, view, _html} = live(conn, ~p"/servers/new")
 

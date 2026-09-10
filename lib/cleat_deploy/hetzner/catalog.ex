@@ -4,7 +4,10 @@ defmodule CleatDeploy.Hetzner.Catalog do
   alias CleatDeploy.AWS.Lightsail.Bundle
 
   # Shared x86 CX line. Prices are EUR stored in monthly_price_usd and
-  # formatted with € for Hetzner servers.
+  # formatted with € for Hetzner servers. USD is a display conversion —
+  # Hetzner invoices in euro.
+  @eur_to_usd Decimal.new("1.16")
+
   @bundles [
     %{
       bundle_id: "cx22",
@@ -53,5 +56,16 @@ defmodule CleatDeploy.Hetzner.Catalog do
       %Bundle{bundle_name: name} -> name
       nil -> bundle_id
     end
+  end
+
+  def format_price(bundle, currency \\ :eur)
+
+  def format_price(%Bundle{monthly_price_usd: %Decimal{} = price}, :usd) do
+    usd = price |> Decimal.mult(@eur_to_usd) |> Decimal.round(2)
+    "$#{usd}/mo"
+  end
+
+  def format_price(%Bundle{monthly_price_usd: %Decimal{} = price}, _currency) do
+    "€#{Decimal.round(price, 2)}/mo"
   end
 end

@@ -25,4 +25,12 @@ defmodule CleatDeploy.Hetzner.CatalogTest do
   test "find_bundle returns nil for unknown types" do
     assert Catalog.find_bundle("nano_3_0") == nil
   end
+
+  test "formats catalog prices in euro or converted dollar" do
+    bundle = Catalog.find_bundle("cx33")
+
+    assert Catalog.format_price(bundle, :eur) == "€7.59/mo"
+    assert Catalog.format_price(bundle, :usd) == "$8.80/mo"
+    assert Catalog.format_price(bundle) == "€7.59/mo"
+  end
 end

@@ -68,6 +68,19 @@ defmodule CleatDeployWeb.AppLive.Layout do
         </div>
       </div>
 
+      <.link
+        :if={@app.host not in [nil, ""]}
+        id="app-host-hero"
+        href={"https://#{@app.host}"}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1.5 font-mono text-sm text-hd-orange transition-colors hover:text-hd-orange-dark hover:underline md:mx-auto"
+      >
+        <.icon name="hero-globe-alt" class="size-3.5" />
+        {@app.host}
+        <.icon name="hero-arrow-top-right-on-square" class="size-3" />
+      </.link>
+
       <button
         id="deploy-button"
         type="button"

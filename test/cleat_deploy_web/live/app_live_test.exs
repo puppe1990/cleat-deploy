@@ -262,6 +262,26 @@ defmodule CleatDeployWeb.AppLiveTest do
     end
   end
 
+  test "links the live system host in the app hero", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "Atelie",
+        slug: "atelie",
+        github_repo: "puppe1990/atelie",
+        host: "atelie.gestaobem.com"
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    assert has_element?(view, "#app-host-hero", "atelie.gestaobem.com")
+    assert has_element?(view, ~s(#app-host-hero[target="_blank"][rel="noopener noreferrer"]))
+    assert has_element?(view, ~s(#app-host-hero[href="https://atelie.gestaobem.com"]))
+  end
+
   test "switches app detail tabs", %{conn: conn, scope: scope, server: server} do
     app = TenancyFixtures.app_fixture(scope, server)
 
