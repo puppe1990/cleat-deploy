@@ -2,6 +2,7 @@ defmodule CleatDeployWeb.ServerLive.Index do
   use CleatDeployWeb, :live_view
 
   alias CleatDeploy.Apps
+  alias CleatDeploy.Hetzner.Catalog
   alias CleatDeploy.Servers
   alias CleatDeploy.Servers.{Provision, Server}
 
@@ -17,6 +18,7 @@ defmodule CleatDeployWeb.ServerLive.Index do
      |> assign(:discovered, [])
      |> assign(:confirming_server, nil)
      |> assign(:form_mode, :create)
+     |> assign(:plan_currency, :eur)
      |> assign(:app_counts, Apps.count_apps_by_server_id(scope))
      |> stream(:servers, Servers.list_servers(scope))}
   end
@@ -43,6 +45,11 @@ defmodule CleatDeployWeb.ServerLive.Index do
   end
 
   @impl true
+  def handle_event("set_plan_currency", %{"currency" => currency}, socket) do
+    currency = if currency == "usd", do: :usd, else: :eur
+    {:noreply, assign(socket, :plan_currency, currency)}
+  end
+
   def handle_event("set_form_mode", %{"mode" => mode}, socket) do
     mode = if mode == "register", do: :register, else: :create
 
@@ -275,9 +282,46 @@ defmodule CleatDeployWeb.ServerLive.Index do
               </div>
 
               <div class="space-y-2">
-                <p class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
-                  Plan
-                </p>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-mono text-[10px] font-semibold uppercase tracking-wider text-hd-muted">
+                    Plan
+                  </p>
+                  <div
+                    id="plan-currency"
+                    class="flex rounded-md border border-hd-border bg-hd-aside p-0.5 text-[11px] font-semibold"
+                    role="group"
+                    aria-label="Plan currency"
+                  >
+                    <button
+                      id="plan-currency-eur"
+                      type="button"
+                      phx-click="set_plan_currency"
+                      phx-value-currency="eur"
+                      aria-pressed={@plan_currency == :eur}
+                      class={[
+                        "rounded px-2.5 py-1 transition-colors",
+                        @plan_currency == :eur && "bg-hd-card text-hd-text",
+                        @plan_currency != :eur && "text-hd-muted hover:text-hd-text"
+                      ]}
+                    >
+                      € EUR
+                    </button>
+                    <button
+                      id="plan-currency-usd"
+                      type="button"
+                      phx-click="set_plan_currency"
+                      phx-value-currency="usd"
+                      aria-pressed={@plan_currency == :usd}
+                      class={[
+                        "rounded px-2.5 py-1 transition-colors",
+                        @plan_currency == :usd && "bg-hd-card text-hd-text",
+                        @plan_currency != :usd && "text-hd-muted hover:text-hd-text"
+                      ]}
+                    >
+                      $ USD
+                    </button>
+                  </div>
+                </div>
                 <div id="bundle-picker" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <label
                     :for={bundle <- Provision.bundles()}
@@ -313,11 +357,17 @@ defmodule CleatDeployWeb.ServerLive.Index do
                         %CleatDeploy.Servers.Server{ram_mb: bundle.ram_mb}
                       )} · {bundle.disk_gb} GB
                     </p>
-                    <p class="mt-2 font-mono text-xs font-semibold text-hd-text">
-                      €{Decimal.round(bundle.monthly_price_usd, 2)}/mo
+                    <p
+                      id={"bundle-#{bundle.bundle_id}-price"}
+                      class="mt-2 font-mono text-xs font-semibold text-hd-text"
+                    >
+                      {Catalog.format_price(bundle, @plan_currency)}
                     </p>
                   </label>
                 </div>
+                <p :if={@plan_currency == :usd} class="text-[10px] text-hd-muted">
+                  Estimate · Hetzner bills in euro (€1 = $1.16)
+                </p>
               </div>
 
               <.input
