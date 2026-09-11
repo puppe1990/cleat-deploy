@@ -517,6 +517,61 @@ defmodule CleatDeployWeb.AppLiveTest do
     refute has_element?(view, "#deploy-terminal-#{newer.id}")
   end
 
+  test "hides history pagination when there are 10 or fewer deployments", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    for i <- 1..10 do
+      {:ok, _} = Deployments.create_deployment(app, %{git_sha: "sha-#{i}"})
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+    refute has_element?(view, "#deployments-pagination")
+  end
+
+  test "paginates version history 10 per page", %{
+    conn: conn,
+    scope: scope,
+    server: server
+  } do
+    app = TenancyFixtures.app_fixture(scope, server)
+
+    deployments =
+      for i <- 1..11 do
+        {:ok, deployment} = Deployments.create_deployment(app, %{git_sha: "sha-#{i}"})
+        deployment
+      end
+
+    oldest = List.first(deployments)
+    newest = List.last(deployments)
+
+    {:ok, view, _html} = live(conn, ~p"/apps/#{app.id}/deployments")
+
+    assert has_element?(view, "#deployments-pagination")
+    assert has_element?(view, "#deployments-page-status", "1-10 of 11")
+    assert has_element?(view, "#deployments-#{newest.id}")
+    refute has_element?(view, "#deployments-#{oldest.id}")
+    assert has_element?(view, "#deployments-page-prev[disabled]")
+    refute has_element?(view, "#deployments-page-next[disabled]")
+
+    view |> element("#deployments-page-next") |> render_click()
+
+    assert has_element?(view, "#deployments-page-status", "11-11 of 11")
+    assert has_element?(view, "#deployments-#{oldest.id}")
+    refute has_element?(view, "#deployments-#{newest.id}")
+    refute has_element?(view, "#deployments-page-prev[disabled]")
+    assert has_element?(view, "#deployments-page-next[disabled]")
+
+    view |> element("#deployments-page-prev") |> render_click()
+
+    assert has_element?(view, "#deployments-page-status", "1-10 of 11")
+    assert has_element?(view, "#deployments-#{newest.id}")
+    refute has_element?(view, "#deployments-#{oldest.id}")
+  end
+
   defp app_name_order(html) do
     html
     |> then(&Regex.scan(~r/href="\/apps\/\d+\/deployments"[^>]*>\s*([^<]+)\s*</, &1))
