@@ -21,6 +21,7 @@ defmodule CleatDeployWeb.AppLive.Deployments do
       |> assign(:app, app)
       |> assign(:apps, Apps.list_app_choices(scope))
       |> assign(:selected_deployment_id, nil)
+      |> assign(:history_page, 1)
       |> assign(:app_memory, nil)
       |> assign(:detail_tabs, Layout.detail_tabs(app.slug == "catalogo", runtime_packages(app)))
       |> refresh_deployments(nil, nil)
@@ -47,6 +48,7 @@ defmodule CleatDeployWeb.AppLive.Deployments do
       {:ok, _job} ->
         {:noreply,
          socket
+         |> assign(:history_page, 1)
          |> refresh_deployments(nil, true)
          |> schedule_poll()
          |> put_flash(:info, "Deploy queued")}
@@ -74,6 +76,13 @@ defmodule CleatDeployWeb.AppLive.Deployments do
          Deployments.get_with_log!(socket.assigns.app, deployment_id)
        )}
     end
+  end
+
+  def handle_event("paginate", %{"page" => page}, socket) do
+    {:noreply,
+     socket
+     |> assign(:history_page, parse_page(page))
+     |> refresh_deployments(socket.assigns.selected_deployment_id, socket.assigns.deploying?)}
   end
 
   @impl true
@@ -219,6 +228,43 @@ defmodule CleatDeployWeb.AppLive.Deployments do
                   </tbody>
                 </table>
               </div>
+              <div
+                :if={@history_total_pages > 1}
+                id="deployments-pagination"
+                class="flex flex-wrap items-center justify-between gap-3 border-t border-hd-border bg-hd-aside px-4 py-2"
+              >
+                <span
+                  id="deployments-page-status"
+                  class="font-mono text-[11px] tabular-nums text-hd-muted"
+                >
+                  {history_range(@history_page, @history_total)} of {@history_total}
+                </span>
+                <div class="flex items-center gap-2">
+                  <button
+                    id="deployments-page-prev"
+                    type="button"
+                    phx-click="paginate"
+                    phx-value-page={@history_page - 1}
+                    disabled={@history_page <= 1}
+                    class="paas-btn-secondary px-2 py-1 text-[10px] uppercase disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <.icon name="hero-chevron-left" class="size-3.5" /> Prev
+                  </button>
+                  <span class="font-mono text-[10px] uppercase tracking-widest text-hd-muted">
+                    Page {@history_page}/{@history_total_pages}
+                  </span>
+                  <button
+                    id="deployments-page-next"
+                    type="button"
+                    phx-click="paginate"
+                    phx-value-page={@history_page + 1}
+                    disabled={@history_page >= @history_total_pages}
+                    class="paas-btn-secondary px-2 py-1 text-[10px] uppercase disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next <.icon name="hero-chevron-right" class="size-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -239,20 +285,23 @@ defmodule CleatDeployWeb.AppLive.Deployments do
   defp refresh_deployments(socket, selected_id, deploying?) do
     scope = socket.assigns.current_scope
     app = socket.assigns.app
-    deployments = Deployments.for_app(scope, app)
+    history = Deployments.page_for_app(scope, app, socket.assigns.history_page)
 
     deploying? =
       case deploying? do
-        nil -> Enum.any?(deployments, &(&1.status in [:queued, :running]))
+        nil -> Deployments.deploying?(scope, app)
         other -> other
       end
 
     socket
-    |> assign(:deployments_empty?, deployments == [])
+    |> assign(:history_page, history.page)
+    |> assign(:history_total, history.total)
+    |> assign(:history_total_pages, history.total_pages)
+    |> assign(:deployments_empty?, history.total == 0)
     |> assign(:selected_deployment_id, selected_id)
-    |> assign(:viewed_deployment, load_viewed(app, deployments, selected_id, deploying?))
+    |> assign(:viewed_deployment, load_viewed(app, history.entries, selected_id, deploying?))
     |> assign(:deploying?, deploying?)
-    |> stream(:deployments, deployments, reset: true)
+    |> stream(:deployments, history.entries, reset: true)
   end
 
   defp load_viewed(app, deployments, selected_id, deploying?) do
@@ -268,7 +317,7 @@ defmodule CleatDeployWeb.AppLive.Deployments do
         Enum.find(deployments, &(&1.status in [:queued, :running])) || List.first(deployments)
 
       selected_id ->
-        Enum.find(deployments, &(&1.id == selected_id)) || List.first(deployments)
+        Enum.find(deployments, &(&1.id == selected_id)) || %{id: selected_id}
 
       true ->
         List.first(deployments)
@@ -281,6 +330,22 @@ defmodule CleatDeployWeb.AppLive.Deployments do
     end
 
     socket
+  end
+
+  defp parse_page(page) when is_binary(page) do
+    case Integer.parse(page) do
+      {n, ""} when n > 0 -> n
+      _ -> 1
+    end
+  end
+
+  defp history_range(_page, 0), do: "0-0"
+
+  defp history_range(page, total) when is_integer(page) and is_integer(total) do
+    page_size = Deployments.history_page_size()
+    from = (page - 1) * page_size + 1
+    to = min(page * page_size, total)
+    "#{from}-#{to}"
   end
 
   defp runtime_packages(app), do: RuntimePackages.resolve(app).packages

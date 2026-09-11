@@ -68,6 +68,10 @@ defmodule CleatDeploy.Deployments do
     :app_id
   ]
 
+  @history_page_size 10
+
+  def history_page_size, do: @history_page_size
+
   def for_app(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app)
       when tenant_id == tenant.id do
     list_for_app(app)
@@ -76,6 +80,17 @@ defmodule CleatDeploy.Deployments do
   def for_app(%Scope{}, %App{}), do: []
 
   def for_app(%App{} = app), do: list_for_app(app)
+
+  def page_for_app(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app, page)
+      when tenant_id == tenant.id and is_integer(page) do
+    list_page_for_app(app, page)
+  end
+
+  def page_for_app(%Scope{}, %App{}, _page), do: empty_history_page()
+
+  def page_for_app(%App{} = app, page) when is_integer(page) do
+    list_page_for_app(app, page)
+  end
 
   def deploying?(%Scope{tenant: tenant}, %App{tenant_id: tenant_id} = app)
       when tenant_id == tenant.id do
@@ -105,12 +120,52 @@ defmodule CleatDeploy.Deployments do
   end
 
   defp list_for_app(%App{} = app) do
-    Repo.all(
-      from d in Deployment,
-        where: d.app_id == ^app.id,
-        order_by: [desc: d.inserted_at, desc: d.id],
-        select: struct(d, ^@history_fields)
-    )
+    Repo.all(history_query(app))
+  end
+
+  defp list_page_for_app(%App{} = app, page) do
+    total = Repo.aggregate(from(d in Deployment, where: d.app_id == ^app.id), :count, :id)
+    total_pages = history_total_pages(total)
+    page = page |> max(1) |> min(total_pages)
+    offset = (page - 1) * @history_page_size
+
+    entries =
+      Repo.all(
+        from d in history_query(app),
+          limit: ^@history_page_size,
+          offset: ^offset
+      )
+
+    %{
+      entries: entries,
+      page: page,
+      page_size: @history_page_size,
+      total: total,
+      total_pages: total_pages
+    }
+  end
+
+  defp history_query(%App{} = app) do
+    from d in Deployment,
+      where: d.app_id == ^app.id,
+      order_by: [desc: d.inserted_at, desc: d.id],
+      select: struct(d, ^@history_fields)
+  end
+
+  defp history_total_pages(0), do: 1
+
+  defp history_total_pages(total) when is_integer(total) and total > 0 do
+    div(total + @history_page_size - 1, @history_page_size)
+  end
+
+  defp empty_history_page do
+    %{
+      entries: [],
+      page: 1,
+      page_size: @history_page_size,
+      total: 0,
+      total_pages: 1
+    }
   end
 
   @doc """

@@ -129,6 +129,67 @@ defmodule CleatDeploy.DeploymentsTest do
     end
   end
 
+  describe "page_for_app/3" do
+    test "returns 10 newest deployments on the first page", %{scope: scope, app: app} do
+      deployments =
+        for i <- 1..11 do
+          {:ok, deployment} = Deployments.create_deployment(app, %{git_sha: "sha-#{i}"})
+          deployment
+        end
+
+      oldest = List.first(deployments)
+      newest = List.last(deployments)
+      page = Deployments.page_for_app(scope, app, 1)
+
+      assert page.page == 1
+      assert page.page_size == 10
+      assert page.total == 11
+      assert page.total_pages == 2
+
+      assert Enum.map(page.entries, & &1.id) ==
+               deployments |> Enum.reverse() |> Enum.take(10) |> Enum.map(& &1.id)
+
+      assert newest.id in Enum.map(page.entries, & &1.id)
+      refute oldest.id in Enum.map(page.entries, & &1.id)
+    end
+
+    test "returns the remaining deployments on page 2", %{scope: scope, app: app} do
+      deployments =
+        for i <- 1..11 do
+          {:ok, deployment} = Deployments.create_deployment(app, %{git_sha: "sha-#{i}"})
+          deployment
+        end
+
+      oldest = List.first(deployments)
+      newest = List.last(deployments)
+      page = Deployments.page_for_app(scope, app, 2)
+
+      assert page.page == 2
+      assert Enum.map(page.entries, & &1.id) == [oldest.id]
+      refute newest.id in Enum.map(page.entries, & &1.id)
+    end
+
+    test "clamps out-of-range pages to the last page", %{scope: scope, app: app} do
+      for i <- 1..11 do
+        {:ok, _} = Deployments.create_deployment(app, %{git_sha: "sha-#{i}"})
+      end
+
+      page = Deployments.page_for_app(scope, app, 99)
+      assert page.page == 2
+      assert length(page.entries) == 1
+    end
+
+    test "returns an empty page for a cross-tenant scope", %{app: app} do
+      {:ok, _} = Deployments.create_deployment(app, %{git_sha: "sha-x"})
+      other_scope = TenancyFixtures.scope_fixture()
+      page = Deployments.page_for_app(other_scope, app, 1)
+
+      assert page.entries == []
+      assert page.total == 0
+      assert page.page == 1
+    end
+  end
+
   describe "deploying?/2" do
     test "is true only while a deploy is queued or running", %{scope: scope, app: app} do
       refute Deployments.deploying?(scope, app)
