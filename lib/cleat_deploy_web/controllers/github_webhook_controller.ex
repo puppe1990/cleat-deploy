@@ -35,8 +35,19 @@ defmodule CleatDeployWeb.GithubWebhookController do
         Logger.warning("github webhook payload missing repository.full_name")
         send_resp(conn, :bad_request, "missing repository")
 
-      :ignore ->
-        # wrong branch / deleted ref — expected noise
+      {:ignore, app, {:wrong_branch, ref}} ->
+        Logger.info(
+          "github webhook ignored app=#{app.slug} ref=#{ref} expected_branch=#{app.branch}"
+        )
+
+        send_resp(
+          conn,
+          :ok,
+          "ignored: push to #{ref}, app #{app.slug} auto-deploys #{app.branch}"
+        )
+
+      {:ignore, app, reason} ->
+        Logger.info("github webhook ignored app=#{app.slug} reason=#{inspect(reason)}")
         send_resp(conn, :ok, "ignored")
 
       :auto_deploy_off ->
@@ -89,7 +100,7 @@ defmodule CleatDeployWeb.GithubWebhookController do
   defp normalize_push_attrs(payload, app) do
     case Github.push_deploy_attrs(payload, app.branch) do
       {:ok, attrs} -> {:ok, attrs}
-      :ignore -> :ignore
+      {:ignore, reason} -> {:ignore, app, reason}
     end
   end
 end

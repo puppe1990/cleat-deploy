@@ -125,6 +125,17 @@ defmodule CleatDeploy.Seeds do
         systemd_unit: "github-projects",
         release_path: "/opt/github-projects"
       })
+
+      seed_app(scope, hetzner_server, tenant_id, %{
+        name: "PratoAI",
+        slug: "prato-ai",
+        github_repo: "gestao-bem/prato-ai",
+        branch: "main",
+        host: "pratoai.gestaobem.com",
+        port: 4007,
+        systemd_unit: "prato_ai",
+        release_path: "/opt/prato_ai"
+      })
     end
 
     {:ok,

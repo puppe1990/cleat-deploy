@@ -77,6 +77,29 @@ defmodule CleatDeploy.Repo.SeedsTest do
     assert projects.systemd_unit == "github-projects"
     assert projects.release_path == "/opt/github-projects"
     assert projects.server_id == server.id
+
+    prato = Enum.find(Apps.list_apps(scope), &(&1.slug == "prato-ai"))
+    assert prato.name == "PratoAI"
+    assert prato.host == "pratoai.gestaobem.com"
+    assert prato.github_repo == "gestao-bem/prato-ai"
+    assert prato.branch == "main"
+    assert prato.port == 4007
+    assert prato.systemd_unit == "prato_ai"
+    assert prato.release_path == "/opt/prato_ai"
+    assert prato.server_id == server.id
+  end
+
+  test "seeds retarget PratoAI from deploy-cleat to main" do
+    assert {:ok, _} = Seeds.run(hetzner_server_ip: "167.233.201.9")
+
+    app = Apps.get_app_by_repo("gestao-bem/prato-ai")
+
+    app
+    |> Ecto.Changeset.change(%{branch: "deploy-cleat"})
+    |> CleatDeploy.Repo.update!()
+
+    assert {:ok, _} = Seeds.run(hetzner_server_ip: "167.233.201.9")
+    assert Apps.get_app_by_repo("gestao-bem/prato-ai").branch == "main"
   end
 
   test "matheus scope sees seeded apps but other user does not" do

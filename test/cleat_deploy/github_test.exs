@@ -28,9 +28,16 @@ defmodule CleatDeploy.GithubTest do
     assert attrs.triggered_by == "webhook"
   end
 
-  test "push_deploy_attrs/2 ignores other branches" do
-    payload = %{"ref" => "refs/heads/dev", "after" => "abc123"}
-    assert :ignore = Github.push_deploy_attrs(payload, "main")
+  test "push_deploy_attrs/2 ignores other branches with the received ref" do
+    payload = %{"ref" => "refs/heads/main", "after" => "abc123"}
+
+    assert {:ignore, {:wrong_branch, "main"}} =
+             Github.push_deploy_attrs(payload, "deploy-cleat")
+  end
+
+  test "push_deploy_attrs/2 ignores deleted refs" do
+    payload = %{"ref" => "refs/heads/main", "after" => String.duplicate("0", 40)}
+    assert {:ignore, :deleted_ref} = Github.push_deploy_attrs(payload, "main")
   end
 
   test "list_repos/0 returns a list when token is missing" do
