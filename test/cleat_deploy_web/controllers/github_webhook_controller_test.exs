@@ -66,6 +66,69 @@ defmodule CleatDeployWeb.GithubWebhookControllerTest do
     assert response(conn, 400) == "missing repository"
   end
 
+  test "ignores push to a different branch with the expected deploy branch" do
+    scope = TenancyFixtures.scope_fixture()
+    server = TenancyFixtures.server_fixture(scope)
+
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "PratoAI",
+        slug: "prato-ai-#{System.unique_integer()}",
+        github_repo: "gestao-bem/prato-ai-#{System.unique_integer()}",
+        branch: "deploy-cleat",
+        host: "pratoai.gestaobem.com"
+      })
+
+    payload =
+      Jason.encode!(%{
+        "ref" => "refs/heads/main",
+        "after" => "abc123def456",
+        "repository" => %{"full_name" => app.github_repo}
+      })
+
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-hub-signature-256", sign(payload, app.webhook_secret))
+      |> post(~p"/webhooks/github", payload)
+
+    body = response(conn, 200)
+    assert body =~ "ignored"
+    assert body =~ "main"
+    assert body =~ "deploy-cleat"
+    refute_enqueued(worker: CleatDeploy.Workers.DeployWorker)
+  end
+
+  test "queues deploy when the push matches a non-main deploy branch" do
+    scope = TenancyFixtures.scope_fixture()
+    server = TenancyFixtures.server_fixture(scope)
+
+    app =
+      TenancyFixtures.app_fixture(scope, server, %{
+        name: "PratoAI",
+        slug: "prato-ai-#{System.unique_integer()}",
+        github_repo: "gestao-bem/prato-ai-#{System.unique_integer()}",
+        branch: "deploy-cleat",
+        host: "pratoai.gestaobem.com"
+      })
+
+    payload =
+      Jason.encode!(%{
+        "ref" => "refs/heads/deploy-cleat",
+        "after" => "abc123def456",
+        "repository" => %{"full_name" => app.github_repo}
+      })
+
+    conn =
+      build_conn()
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-hub-signature-256", sign(payload, app.webhook_secret))
+      |> post(~p"/webhooks/github", payload)
+
+    assert response(conn, 202) == "queued"
+    assert_enqueued(worker: CleatDeploy.Workers.DeployWorker)
+  end
+
   defp sign(body, secret) do
     "sha256=" <> (:crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower))
   end

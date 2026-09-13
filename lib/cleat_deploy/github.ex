@@ -38,12 +38,21 @@ defmodule CleatDeploy.Github do
   Parses push event payload and returns deploy attrs when branch matches.
   """
   def push_deploy_attrs(payload, branch \\ "main") do
-    with %{"ref" => "refs/heads/" <> ref, "after" => sha} <- payload,
-         true <- ref == branch,
-         false <- sha in [nil, String.duplicate("0", 40)] do
-      {:ok, %{git_sha: sha, git_ref: ref, triggered_by: "webhook"}}
-    else
-      _ -> :ignore
+    case payload do
+      %{"ref" => "refs/heads/" <> ref, "after" => sha} when is_binary(sha) and sha != "" ->
+        cond do
+          sha == String.duplicate("0", 40) ->
+            {:ignore, :deleted_ref}
+
+          ref != branch ->
+            {:ignore, {:wrong_branch, ref}}
+
+          true ->
+            {:ok, %{git_sha: sha, git_ref: ref, triggered_by: "webhook"}}
+        end
+
+      _ ->
+        {:ignore, :invalid_payload}
     end
   end
 

@@ -121,6 +121,15 @@ defmodule CleatDeploy.Apps.Provisioning do
       systemd_unit: "cifra",
       release_path: "/opt/cifra",
       server_name: "gestaobem-cx33"
+    },
+    "gestao-bem/prato-ai" => %{
+      name: "PratoAI",
+      slug: "prato-ai",
+      host: "pratoai.gestaobem.com",
+      port: 4007,
+      systemd_unit: "prato_ai",
+      release_path: "/opt/prato_ai",
+      server_name: "gestaobem-cx33"
     }
   }
 

@@ -70,6 +70,24 @@ defmodule CleatDeploy.Apps.ProvisioningTest do
     assert preset["server_id"] == hetzner.id
   end
 
+  test "preset_from_repo/2 uses known profile for prato-ai on hetzner", %{
+    servers: servers
+  } do
+    scope = TenancyFixtures.scope_fixture()
+    hetzner = TenancyFixtures.server_fixture(scope, %{name: "gestaobem-cx33"})
+
+    preset = Provisioning.preset_from_repo("gestao-bem/prato-ai", [hetzner | servers])
+
+    assert preset["name"] == "PratoAI"
+    assert preset["slug"] == "prato-ai"
+    assert preset["host"] == "pratoai.gestaobem.com"
+    assert preset["port"] == 4007
+    assert preset["branch"] == "main"
+    assert preset["systemd_unit"] == "prato_ai"
+    assert preset["release_path"] == "/opt/prato_ai"
+    assert preset["server_id"] == hetzner.id
+  end
+
   test "preset_from_repo/2 uses golang profile for cifra-finops on hetzner", %{
     servers: servers
   } do
